@@ -158,8 +158,11 @@ export const pendaftaranAkun = pgTable("pendaftaran_akun", {
   id: text().primaryKey(),
   nama: text().notNull(),
   email: text().notNull(),
+  // Kosong bila mendaftar lewat Google (sekolah dipilih admin saat menyetujui).
   sekolah: text().notNull(),
-  passwordHash: text().notNull(),
+  // Kosong untuk pendaftaran lewat Google, karena login memakai akun Google.
+  passwordHash: text(),
+  sumber: text().$type<"Formulir" | "Google">().notNull().default("Formulir"),
   status: text().$type<"Menunggu" | "Disetujui" | "Ditolak">().notNull().default("Menunggu"),
   dibuatPada: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

@@ -49,7 +49,8 @@ export const getCurrentAccount = cache(async (): Promise<SessionAccount | null> 
 
   if (session.tipe === "pengguna") {
     const [p] = await db.select().from(schema.pengguna).where(eq(schema.pengguna.id, session.sub));
-    if (!p || p.status !== "Aktif" || !p.passwordHash) return null;
+    // Akun bisa masuk lewat password atau Google, jadi cukup dicek masih aktif.
+    if (!p || p.status !== "Aktif") return null;
     const lintasSekolah = roleLintasSekolah.includes(p.role);
     return {
       id: p.id,
@@ -63,7 +64,7 @@ export const getCurrentAccount = cache(async (): Promise<SessionAccount | null> 
   }
 
   const [a] = await db.select().from(schema.alumni).where(eq(schema.alumni.nik, session.sub));
-  if (!a || !a.passwordHash) return null;
+  if (!a) return null;
   return {
     id: a.nik,
     email: a.email,
