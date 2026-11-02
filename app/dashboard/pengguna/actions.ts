@@ -3,7 +3,15 @@
 import { randomInt } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { roleLintasSekolah, SEMUA_SEKOLAH, type Pengguna, type RolePengguna, type StatusPengguna } from "@/data/pengguna";
+import {
+  roleLintasSekolah,
+  rolePenggunaOptions,
+  SEMUA_SEKOLAH,
+  statusPenggunaOptions,
+  type Pengguna,
+  type RolePengguna,
+  type StatusPengguna,
+} from "@/data/pengguna";
 import { akunAdmin, isSuperAdmin, sesiBerakhir, tidakBerhak, type HasilAksi } from "@/lib/aksi-server";
 import { emailTerpakai } from "@/lib/data";
 import { hashPassword } from "@/lib/password";
@@ -21,6 +29,8 @@ function cekHakAkses(account: SessionAccount, data: Pick<Pengguna, "role" | "sek
 
 async function validasi(data: DataPengguna, kecualiId?: string): Promise<HasilAksi | null> {
   if (!data.nama.trim()) return { error: "Nama wajib diisi." };
+  if (!rolePenggunaOptions.includes(data.role)) return { error: "Role tidak dikenal." };
+  if (!statusPenggunaOptions.includes(data.status)) return { error: "Status tidak dikenal." };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return { error: "Format email tidak valid." };
   if (await emailTerpakai(data.email, { penggunaId: kecualiId })) {
     return { error: "Email sudah digunakan akun lain." };

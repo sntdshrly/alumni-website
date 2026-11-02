@@ -96,10 +96,6 @@ type DialogMode = "view" | "edit" | "delete" | "reset";
 const roleStyles: Record<RolePengguna, string> = {
   "Super Admin": "bg-violet-50 text-violet-700",
   "Admin Sekolah": "bg-blue-50 text-blue-700",
-  "Karyawan TU": "bg-cyan-50 text-cyan-700",
-  "Guru Wali Kelas": "bg-amber-50 text-amber-700",
-  "Kepala Sekolah": "bg-emerald-50 text-emerald-700",
-  Yayasan: "bg-slate-100 text-slate-600",
 };
 
 const statusStyles: Record<StatusPengguna, string> = {
@@ -146,7 +142,7 @@ function emptyDraft(defaultSekolah: string): FormDraft {
     nama: "",
     email: "",
     noHp: "",
-    role: "Karyawan TU",
+    role: "Admin Sekolah",
     sekolah: defaultSekolah,
     status: "Aktif",
   };
