@@ -1,10 +1,10 @@
 "use client";
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { statusAlumni, dashboardData } from "@/data/dashboard";
 import { Panel } from "@/components/panel";
+import type { ItemPersen } from "@/lib/dashboard-stats";
 
-export function StatusChart() {
+export function StatusChart({ data: statusAlumni, total }: { data: ItemPersen[]; total: number }) {
   return (
     <Panel title="Status Alumni Setelah Lulus">
       <div className="flex flex-col items-center gap-4">
@@ -32,7 +32,7 @@ export function StatusChart() {
           </ResponsiveContainer>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
             <p className="text-xs text-slate-500">Total Alumni</p>
-            <p className="text-xl font-semibold text-slate-900">{dashboardData.totalAlumni}</p>
+            <p className="text-xl font-semibold text-slate-900">{total}</p>
           </div>
         </div>
 

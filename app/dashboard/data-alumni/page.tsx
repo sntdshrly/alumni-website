@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { requireAccount } from "@/lib/session";
 import { AlumniManager } from "@/components/alumni/alumni-manager";
-import { perguruanTinggiList } from "@/data/perguruan-tinggi";
-import { sekolahList } from "@/data/sekolah";
+import { listPerguruanTinggi, namaSekolah } from "@/lib/data";
 
 export const metadata: Metadata = {
   title: "Data Alumni",
@@ -10,10 +9,11 @@ export const metadata: Metadata = {
 
 export default async function DataAlumniPage() {
   const account = await requireAccount("admin");
+  const [sekolahOptions, perguruanTinggi] = await Promise.all([namaSekolah(account), listPerguruanTinggi()]);
   return (
     <AlumniManager
-      sekolahOptions={sekolahList.map((s) => s.nama)}
-      perguruanTinggi={perguruanTinggiList}
+      sekolahOptions={sekolahOptions}
+      perguruanTinggi={perguruanTinggi}
       currentAdmin={account.name}
     />
   );

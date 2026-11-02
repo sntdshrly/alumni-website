@@ -1,8 +1,8 @@
 "use server";
 
+import { and, count, eq } from "drizzle-orm";
 import { refresh, revalidatePath } from "next/cache";
-import { findAcara, togglePendaftaran } from "@/lib/acara-store";
-import { sekolahAlumni } from "@/lib/portal-data";
+import { db, schema } from "@/lib/db";
 import { getCurrentAccount } from "@/lib/session";
 
 export type DaftarAcaraResult =
@@ -15,17 +15,32 @@ export async function toggleIkutAcara(acaraId: string): Promise<DaftarAcaraResul
   if (!account || account.role !== "alumni" || !account.alumniNik) {
     return { error: "Sesi berakhir. Silakan masuk kembali." };
   }
+  const nik = account.alumniNik;
   // Alumni hanya boleh mendaftar acara sekolahnya sendiri.
-  const acara = findAcara(acaraId);
-  if (!acara || acara.sekolah !== sekolahAlumni(account)) {
+  const [acara] = await db.select().from(schema.acara).where(eq(schema.acara.id, acaraId));
+  if (!acara || acara.sekolah !== account.school) {
     return { error: "Acara tidak ditemukan." };
   }
 
-  const hasil = togglePendaftaran(acaraId, account.alumniNik);
-  if ("error" in hasil) return { error: hasil.error };
+  const syarat = and(eq(schema.acaraPeserta.acaraId, acaraId), eq(schema.acaraPeserta.nik, nik));
+  const [sudahIkut] = await db.select().from(schema.acaraPeserta).where(syarat);
+
+  let ikut: boolean;
+  if (sudahIkut) {
+    await db.delete(schema.acaraPeserta).where(syarat);
+    ikut = false;
+  } else {
+    const [{ n }] = await db
+      .select({ n: count() })
+      .from(schema.acaraPeserta)
+      .where(eq(schema.acaraPeserta.acaraId, acaraId));
+    if (acara.terdaftar + n >= acara.kuota) return { error: "Kuota acara sudah penuh." };
+    await db.insert(schema.acaraPeserta).values({ acaraId, nik }).onConflictDoNothing();
+    ikut = true;
+  }
 
   revalidatePath("/alumni/jaringan");
   revalidatePath("/dashboard/acara");
   refresh();
-  return { ikut: hasil.ikut, judul: hasil.acara.judul, tanggal: hasil.acara.tanggal };
+  return { ikut, judul: acara.judul, tanggal: acara.tanggal };
 }

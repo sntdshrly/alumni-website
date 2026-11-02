@@ -1,13 +1,13 @@
 import { Sidebar } from "@/components/sidebar";
 import { AlumniProvider } from "@/components/alumni/alumni-store";
 import { PortalProvider } from "@/components/alumni-portal/portal-store";
-import { getPortalData } from "@/lib/portal-data";
+import { getPortalData } from "@/lib/data";
 import { requireAccount } from "@/lib/session";
 
 export default async function AlumniLayout({ children }: { children: React.ReactNode }) {
   const account = await requireAccount("alumni");
   // Hanya data alumni sesekolah yang boleh dilihat yang dikirim ke browser.
-  const { alumni, cerita } = getPortalData(account);
+  const { alumni, cerita } = await getPortalData(account);
 
   return (
     <AlumniProvider initialAlumni={alumni}>

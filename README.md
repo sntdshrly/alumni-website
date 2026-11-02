@@ -6,15 +6,19 @@ rekomendasi karier.
 
 **Demo:** https://binus-alumni.vercel.app
 
-> Status: MVP. Semua data masih **dummy** dan disimpan di memori server, jadi perubahan akan
-> kembali ke data awal ketika server di-restart. Belum terhubung ke database.
+> Status: MVP. Data tersimpan di database Postgres (Neon). Isi awalnya masih data contoh,
+> bukan data alumni asli.
 
 ## Akun Demo
 
 | Role | Email | Password |
 |---|---|---|
-| Super Admin | `superadmin@binus.ac.id` | `password123` |
+| Super Admin (semua sekolah) | `superadmin@binus.ac.id` | `password123` |
+| Admin Sekolah (SMA Permai saja) | `admin@smapermai.sch.id` | `permai123` |
 | Alumni | `alya.putri@gmail.com` | `alumni123` |
+
+Admin Sekolah hanya bisa melihat dan mengubah data sekolahnya sendiri. Admin baru dibuat Super
+Admin lewat menu Daftar Pengguna, lalu diberi password sementara dengan tombol **Reset Password**.
 
 ## Fitur
 
@@ -42,8 +46,9 @@ rekomendasi karier.
 
 ### Autentikasi
 
-Login, registrasi (menunggu persetujuan admin), dan lupa password. Akses halaman dibatasi per
-role lewat `proxy.ts`.
+Login dengan password ber-hash (scrypt) dan cookie sesi bertanda tangan (JWT, `SESSION_SECRET`).
+Registrasi tersimpan sebagai permintaan yang menunggu persetujuan admin. Akses halaman dibatasi
+per role lewat `proxy.ts`, dan batas sekolah diperiksa ulang di setiap halaman dan server action.
 
 ## Teknologi
 
@@ -52,15 +57,26 @@ role lewat `proxy.ts`.
 - Tailwind CSS 4 dengan komponen shadcn/ui (Base UI)
 - Recharts untuk grafik
 - SheetJS (`xlsx`) untuk import Excel
+- Postgres (Neon) dengan Drizzle ORM
 
 ## Menjalankan Secara Lokal
 
-Butuh Node.js 20 atau lebih baru.
+Butuh Node.js 20 atau lebih baru dan akses ke project Vercel (untuk mengambil koneksi database).
 
 ```bash
 npm install
+npx vercel env pull .env.local   # DATABASE_URL dan SESSION_SECRET
 npm run dev
 ```
+
+Untuk database baru yang masih kosong:
+
+```bash
+npx drizzle-kit migrate          # membuat tabel dari folder drizzle/
+npm run db:seed                  # mengisi data awal (hanya bila database kosong)
+```
+
+`npm run db:seed -- --reset` **menghapus semua data** lalu mengisi ulang data awal.
 
 Buka http://localhost:3000 lalu login dengan salah satu akun demo di atas.
 
@@ -77,13 +93,15 @@ npm run lint    # cek ESLint
 ```text
 app/          Halaman (App Router): login, register, dashboard admin, portal alumni
 components/   Komponen UI per fitur, plus components/ui untuk komponen dasar
-data/         Data dummy: alumni, sekolah, perguruan tinggi, acara, RIASEC
-lib/          Logika: auth & sesi, forecasting, career finder, export CSV, import Excel
+data/         Tipe, pilihan, dan data awal (seed): alumni, sekolah, perguruan tinggi, acara, RIASEC
+drizzle/      File migrasi SQL database
+lib/          Logika: database, auth & sesi, query per sekolah, forecasting, career finder
+scripts/      Skrip seed database
 proxy.ts      Pembatasan akses halaman berdasarkan role
 prd.md        Product requirements document
 ```
 
 ## Deploy
 
-Aplikasi di-deploy ke Vercel. Setiap push ke branch `main` otomatis ter-deploy ke
-https://binus-alumni.vercel.app.
+Aplikasi di-deploy ke Vercel (https://binus-alumni.vercel.app) dengan `npx vercel deploy --prod`.
+Environment variable yang dibutuhkan: `DATABASE_URL` (otomatis dari integrasi Neon) dan `SESSION_SECRET`.

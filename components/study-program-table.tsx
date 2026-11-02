@@ -6,10 +6,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { topStudyPrograms } from "@/data/dashboard";
 import { Panel } from "@/components/panel";
+import type { ItemPersen } from "@/lib/dashboard-stats";
 
-export function StudyProgramTable() {
+export function StudyProgramTable({ data: topStudyPrograms }: { data: ItemPersen[] }) {
   return (
     <Panel title="Top 5 Program Studi Tujuan">
       <Table className="table-fixed">

@@ -21,6 +21,8 @@ import { DownloadReportButton } from "@/components/download-report-button";
 import { ValidasiBadge, validasiDeskripsi, validasiKpi } from "@/components/validasi";
 import { downloadCsv, reportFilename } from "@/lib/export-csv";
 import { socialLabel } from "@/lib/kontak";
+import { AksiError, useAksi } from "@/components/aksi";
+import { verifikasiAlumni } from "@/app/dashboard/data-alumni/actions";
 import { Input } from "@/components/ui/input";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -119,6 +121,7 @@ export function VerificationManager({
   currentAdmin,
 }: VerificationManagerProps) {
   const [alumniList, setAlumniList] = useAlumniStore();
+  const { jalankan, error: aksiError, tutupError, isPending } = useAksi();
   const [sekolahFilter, setSekolahFilter] = useState("semua");
   const [validasiFilter, setValidasiFilter] = useState<"semua" | StatusValidasi>("semua");
   const [statusFilter, setStatusFilter] = useState<"semua" | StatusSetelahLulus>("semua");
@@ -187,16 +190,17 @@ export function VerificationManager({
 
   // Perubahan status langsung tersimpan ke data alumni bersama, atas nama admin yang login.
   function applyStatus(validasi: StatusValidasi, note = "") {
-    if (!selected) return;
-    setAlumniList((prev) =>
-      prev.map((a) =>
-        a.nik === selected.nik
-          ? { ...a, validasi, pemeriksa: currentAdmin, catatanValidasi: note.trim() }
-          : a,
-      ),
+    if (!selected || isPending) return;
+    const nik = selected.nik;
+    const hasil = { validasi, pemeriksa: currentAdmin, catatanValidasi: note.trim() };
+    jalankan(
+      () => verifikasiAlumni(nik, hasil),
+      () => {
+        setAlumniList((prev) => prev.map((a) => (a.nik === nik ? { ...a, ...hasil } : a)));
+        setIsRejecting(false);
+        setCatatan("");
+      },
     );
-    setIsRejecting(false);
-    setCatatan("");
   }
 
   const isFilterActive = validasiFilter !== "semua" || statusFilter !== "semua";
@@ -218,6 +222,7 @@ export function VerificationManager({
 
   return (
     <>
+      <AksiError pesan={aksiError} onClose={tutupError} />
       <Header
         title="Verifikasi Data"
         actions={

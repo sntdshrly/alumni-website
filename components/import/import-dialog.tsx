@@ -26,7 +26,8 @@ type ImportDialogProps<T> = {
   // Memvalidasi seluruh baris sekaligus agar duplikat di dalam file juga terdeteksi.
   validasi: (baris: BarisImpor[]) => HasilValidasi<T>[];
   label: (item: T) => string;
-  onImport: (items: T[]) => void;
+  // Menyimpan data ke server; dialog baru menampilkan "berhasil" bila tidak ada error.
+  onImport: (items: T[]) => Promise<{ error?: string }>;
 };
 
 type Tahap =
@@ -51,6 +52,7 @@ export function ImportDialog<T>({
   const [tahap, setTahap] = useState<Tahap>({ jenis: "pilih" });
   const [error, setError] = useState("");
   const [memproses, setMemproses] = useState(false);
+  const [menyimpan, setMenyimpan] = useState(false);
   const [seret, setSeret] = useState(false);
 
   function tutup(next: boolean) {
@@ -89,10 +91,19 @@ export function ImportDialog<T>({
   const valid = hasil.filter((h): h is HasilValidasi<T> & { data: T } => h.data !== undefined);
   const gagal = hasil.filter((h) => h.error);
 
-  function tambahkan() {
+  async function tambahkan() {
     if (valid.length === 0) return;
-    onImport(valid.map((h) => h.data));
-    setTahap({ jenis: "selesai", jumlah: valid.length });
+    setMenyimpan(true);
+    setError("");
+    try {
+      const hasil = await onImport(valid.map((h) => h.data));
+      if (hasil.error) setError(hasil.error);
+      else setTahap({ jenis: "selesai", jumlah: valid.length });
+    } catch {
+      setError("Gagal terhubung ke server. Coba lagi.");
+    } finally {
+      setMenyimpan(false);
+    }
   }
 
   return (
@@ -238,6 +249,7 @@ export function ImportDialog<T>({
                 </ul>
               </div>
             )}
+            {error && <p className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-600">{error}</p>}
           </div>
         )}
 
@@ -259,10 +271,15 @@ export function ImportDialog<T>({
           )}
           {tahap.jenis === "pratinjau" && (
             <>
-              <Button variant="outline" onClick={() => setTahap({ jenis: "pilih" })}>
+              <Button variant="outline" disabled={menyimpan} onClick={() => setTahap({ jenis: "pilih" })}>
                 Pilih File Lain
               </Button>
-              <Button className="bg-blue-600 hover:bg-blue-700" disabled={valid.length === 0} onClick={tambahkan}>
+              <Button
+                className="gap-1.5 bg-blue-600 hover:bg-blue-700"
+                disabled={valid.length === 0 || menyimpan}
+                onClick={() => void tambahkan()}
+              >
+                {menyimpan && <Loader2 className="animate-spin" />}
                 Tambahkan {valid.length} Data
               </Button>
             </>

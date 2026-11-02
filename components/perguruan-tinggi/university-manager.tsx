@@ -32,6 +32,12 @@ import {
 } from "@/components/import/definisi-impor";
 import { DownloadReportButton } from "@/components/download-report-button";
 import { downloadCsv, reportFilename } from "@/lib/export-csv";
+import { AksiError, useAksi } from "@/components/aksi";
+import {
+  hapusPerguruanTinggi,
+  tambahPerguruanTinggi,
+  ubahPerguruanTinggi,
+} from "@/app/dashboard/perguruan-tinggi/actions";
 import { Input } from "@/components/ui/input";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -70,6 +76,8 @@ import {
 
 type UniversityManagerProps = {
   institutions: PerguruanTinggi[];
+  // false untuk Admin Sekolah: data perguruan tinggi hanya bisa dibaca.
+  bisaKelola: boolean;
 };
 
 type JenisFilter = "semua" | JenisPT;
@@ -312,8 +320,9 @@ function InstitutionFormFields({
   );
 }
 
-export function UniversityManager({ institutions: initialInstitutions }: UniversityManagerProps) {
+export function UniversityManager({ institutions: initialInstitutions, bisaKelola }: UniversityManagerProps) {
   const [institutions, setInstitutions] = useState(initialInstitutions);
+  const { jalankan, error: aksiError, tutupError, isPending } = useAksi();
   const [jenisFilter, setJenisFilter] = useState<JenisFilter>("semua");
   const [lokasiFilter, setLokasiFilter] = useState("semua");
   const [sortBy, setSortBy] = useState<SortOption>("default");
@@ -391,16 +400,27 @@ export function UniversityManager({ institutions: initialInstitutions }: Univers
 
   function saveEdit() {
     if (!selected || !draft || !isEditComplete) return;
-    const fields = fieldsFromDraft(draft);
-    setInstitutions((prev) => prev.map((pt) => (pt.id === selected.id ? { ...pt, ...fields } : pt)));
-    setMode("view");
+    const updated: PerguruanTinggi = { ...selected, ...fieldsFromDraft(draft) };
+    jalankan(
+      () => ubahPerguruanTinggi(updated),
+      () => {
+        setInstitutions((prev) => prev.map((pt) => (pt.id === updated.id ? updated : pt)));
+        setMode("view");
+      },
+    );
   }
 
   function confirmDelete() {
     if (!selected) return;
-    setInstitutions((prev) => prev.filter((pt) => pt.id !== selected.id));
-    setSelectedId(null);
-    setMode("view");
+    const id = selected.id;
+    jalankan(
+      () => hapusPerguruanTinggi(id),
+      () => {
+        setInstitutions((prev) => prev.filter((pt) => pt.id !== id));
+        setSelectedId(null);
+        setMode("view");
+      },
+    );
   }
 
   function openAddDialog() {
@@ -413,23 +433,23 @@ export function UniversityManager({ institutions: initialInstitutions }: Univers
     if (!open) setAddDraft(emptyDraft());
   }
 
-  function importPerguruanTinggi(items: PerguruanTinggiImpor[]) {
-    setInstitutions((prev) => {
-      const next = [...prev];
-      for (const item of items) {
-        next.push({
-          ...item,
-          id: generateUniqueId(item.singkatan || item.nama, next),
-          kode: nextKode(next),
-          alumni: 0,
-          prodi: 0,
-          buktiTerverifikasi: 0,
-          sumberData: "Import Excel",
-          terakhirDiperbarui: formatToday(),
-        });
-      }
-      return next;
-    });
+  async function importPerguruanTinggi(items: PerguruanTinggiImpor[]) {
+    const next = [...institutions];
+    for (const item of items) {
+      next.push({
+        ...item,
+        id: generateUniqueId(item.singkatan || item.nama, next),
+        kode: nextKode(next),
+        alumni: 0,
+        prodi: 0,
+        buktiTerverifikasi: 0,
+        sumberData: "Import Excel",
+        terakhirDiperbarui: formatToday(),
+      });
+    }
+    const hasil = await tambahPerguruanTinggi(next.slice(institutions.length));
+    if (!hasil.error) setInstitutions(next);
+    return hasil;
   }
 
   function submitAdd() {
@@ -444,9 +464,14 @@ export function UniversityManager({ institutions: initialInstitutions }: Univers
       buktiTerverifikasi: 0,
       sumberData: "Input manual",
     };
-    setInstitutions((prev) => [...prev, newInstitution]);
-    setIsAddOpen(false);
-    setAddDraft(emptyDraft());
+    jalankan(
+      () => tambahPerguruanTinggi([newInstitution]),
+      () => {
+        setInstitutions((prev) => [...prev, newInstitution]);
+        setIsAddOpen(false);
+        setAddDraft(emptyDraft());
+      },
+    );
   }
 
   const isFilterActive = lokasiFilter !== "semua" || sortBy !== "default";
@@ -468,6 +493,7 @@ export function UniversityManager({ institutions: initialInstitutions }: Univers
 
   return (
     <>
+      <AksiError pesan={aksiError} onClose={tutupError} />
       <Header
         title="Perguruan Tinggi"
         actions={
@@ -598,14 +624,18 @@ export function UniversityManager({ institutions: initialInstitutions }: Univers
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button variant="outline" className="gap-1.5" onClick={() => setIsImportOpen(true)}>
-                  <FileSpreadsheet className="size-4" />
-                  Import Excel
-                </Button>
-                <Button className="gap-1.5 bg-blue-600 hover:bg-blue-700" onClick={openAddDialog}>
-                  <Plus className="size-4" />
-                  Tambah Perguruan Tinggi
-                </Button>
+                {bisaKelola && (
+                  <>
+                    <Button variant="outline" className="gap-1.5" onClick={() => setIsImportOpen(true)}>
+                      <FileSpreadsheet className="size-4" />
+                      Import Excel
+                    </Button>
+                    <Button className="gap-1.5 bg-blue-600 hover:bg-blue-700" onClick={openAddDialog}>
+                      <Plus className="size-4" />
+                      Tambah Perguruan Tinggi
+                    </Button>
+                  </>
+                )}
                 <ImportDialog<PerguruanTinggiImpor>
                   open={isImportOpen}
                   onOpenChange={setIsImportOpen}
@@ -720,16 +750,18 @@ export function UniversityManager({ institutions: initialInstitutions }: Univers
                     </div>
                   </div>
 
-                  <DialogFooter>
-                    <Button variant="outline" className="gap-1.5" onClick={() => setMode("delete")}>
-                      <Trash2 className="size-3.5 text-rose-600" />
-                      <span className="text-rose-600">Hapus</span>
-                    </Button>
-                    <Button className="gap-1.5 bg-blue-600 hover:bg-blue-700" onClick={startEdit}>
-                      <Pencil className="size-3.5" />
-                      Edit Perguruan Tinggi
-                    </Button>
-                  </DialogFooter>
+                  {bisaKelola && (
+                    <DialogFooter>
+                      <Button variant="outline" className="gap-1.5" onClick={() => setMode("delete")}>
+                        <Trash2 className="size-3.5 text-rose-600" />
+                        <span className="text-rose-600">Hapus</span>
+                      </Button>
+                      <Button className="gap-1.5 bg-blue-600 hover:bg-blue-700" onClick={startEdit}>
+                        <Pencil className="size-3.5" />
+                        Edit Perguruan Tinggi
+                      </Button>
+                    </DialogFooter>
+                  )}
                 </>
               )}
 
@@ -756,7 +788,7 @@ export function UniversityManager({ institutions: initialInstitutions }: Univers
                     </Button>
                     <Button
                       className="bg-blue-600 hover:bg-blue-700"
-                      disabled={!isEditComplete}
+                      disabled={!isEditComplete || isPending}
                       onClick={saveEdit}
                     >
                       Simpan Perubahan
@@ -781,7 +813,7 @@ export function UniversityManager({ institutions: initialInstitutions }: Univers
                     <Button variant="outline" onClick={() => setMode("view")}>
                       Batal
                     </Button>
-                    <Button variant="destructive" onClick={confirmDelete}>
+                    <Button variant="destructive" disabled={isPending} onClick={confirmDelete}>
                       Ya, Hapus Perguruan Tinggi
                     </Button>
                   </DialogFooter>
@@ -808,7 +840,7 @@ export function UniversityManager({ institutions: initialInstitutions }: Univers
                 <Button variant="outline" onClick={() => closeAddDialog(false)}>
                   Batal
                 </Button>
-                <Button className="bg-blue-600 hover:bg-blue-700" disabled={!isAddComplete} onClick={submitAdd}>
+                <Button className="bg-blue-600 hover:bg-blue-700" disabled={!isAddComplete || isPending} onClick={submitAdd}>
                   Simpan Perguruan Tinggi
                 </Button>
               </DialogFooter>

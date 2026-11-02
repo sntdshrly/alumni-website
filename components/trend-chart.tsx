@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   Bar,
   CartesianGrid,
@@ -11,12 +12,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { trendAlumni } from "@/data/dashboard";
 import { linearRegression, nextTahunAjaran } from "@/lib/forecast";
 import { Panel } from "@/components/panel";
+import type { DashboardView } from "@/lib/dashboard-stats";
 
 // Jumlah periode ke depan yang diprediksi.
 const FORECAST_PERIODS = 2;
+// Regresi butuh minimal beberapa titik agar garis trennya bermakna.
+const MIN_TITIK_PREDIKSI = 3;
 
 type TrendRow = {
   year: string;
@@ -26,30 +29,35 @@ type TrendRow = {
   persentasePrediksi?: number;
 };
 
-const modelJumlah = linearRegression(trendAlumni.map((d) => d.jumlah));
-const modelPersentase = linearRegression(trendAlumni.map((d) => d.persentase));
+function hitungPrediksi(tren: DashboardView["tren"]) {
+  if (tren.length < MIN_TITIK_PREDIKSI) {
+    return { chartData: tren as TrendRow[], forecastRows: [] as TrendRow[], r2: null };
+  }
+  const modelJumlah = linearRegression(tren.map((d) => d.jumlah));
+  const modelPersentase = linearRegression(tren.map((d) => d.persentase));
+  const lastIndex = tren.length - 1;
+  const lastYear = tren[lastIndex].year;
 
-const lastIndex = trendAlumni.length - 1;
-const lastYear = trendAlumni[lastIndex].year;
+  const forecastRows: TrendRow[] = Array.from({ length: FORECAST_PERIODS }, (_, i) => {
+    const x = lastIndex + 1 + i;
+    return {
+      year: nextTahunAjaran(lastYear, i + 1),
+      jumlahPrediksi: Math.max(0, Math.round(modelJumlah.predict(x))),
+      persentasePrediksi:
+        Math.round(Math.min(100, Math.max(0, modelPersentase.predict(x))) * 10) / 10,
+    };
+  });
 
-const forecastRows: TrendRow[] = Array.from({ length: FORECAST_PERIODS }, (_, i) => {
-  const x = lastIndex + 1 + i;
-  return {
-    year: nextTahunAjaran(lastYear, i + 1),
-    jumlahPrediksi: Math.max(0, Math.round(modelJumlah.predict(x))),
-    persentasePrediksi:
-      Math.round(Math.min(100, Math.max(0, modelPersentase.predict(x))) * 10) / 10,
-  };
-});
-
-const chartData: TrendRow[] = [
-  ...trendAlumni.map((d, i) => ({
-    ...d,
-    // Titik terakhir data aktual ikut di garis prediksi agar garis putus-putus tersambung.
-    persentasePrediksi: i === lastIndex ? d.persentase : undefined,
-  })),
-  ...forecastRows,
-];
+  const chartData: TrendRow[] = [
+    ...tren.map((d, i) => ({
+      ...d,
+      // Titik terakhir data aktual ikut di garis prediksi agar garis putus-putus tersambung.
+      persentasePrediksi: i === lastIndex ? d.persentase : undefined,
+    })),
+    ...forecastRows,
+  ];
+  return { chartData, forecastRows, r2: { jumlah: modelJumlah.r2, persentase: modelPersentase.r2 } };
+}
 
 function TrendTooltip({
   active,
@@ -78,7 +86,9 @@ function TrendTooltip({
   );
 }
 
-export function TrendChart() {
+export function TrendChart({ tren }: { tren: DashboardView["tren"] }) {
+  const { chartData, forecastRows, r2 } = useMemo(() => hitungPrediksi(tren), [tren]);
+
   return (
     <Panel title="Tren Alumni Melanjutkan ke Perguruan Tinggi">
       <div className="flex h-full flex-col">
@@ -86,12 +96,14 @@ export function TrendChart() {
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 10, right: 8, left: -20, bottom: 0 }}>
               <CartesianGrid vertical={false} stroke="#eef0f3" />
-              <ReferenceArea
-                x1={forecastRows[0].year}
-                x2={forecastRows[forecastRows.length - 1].year}
-                fill="#e2e8f0"
-                fillOpacity={0.9}
-              />
+              {forecastRows.length > 0 && (
+                <ReferenceArea
+                  x1={forecastRows[0].year}
+                  x2={forecastRows[forecastRows.length - 1].year}
+                  fill="#e2e8f0"
+                  fillOpacity={0.9}
+                />
+              )}
               <XAxis
                 dataKey="year"
                 tick={{ fontSize: 11, fill: "#64748b" }}
@@ -130,12 +142,18 @@ export function TrendChart() {
             </ComposedChart>
           </ResponsiveContainer>
         </div>
-        <p className="mt-2 text-[11px] text-slate-500">
-          Area abu-abu: prediksi {FORECAST_PERIODS} tahun ke depan dengan regresi linear
-          (R² jumlah {Math.round(modelJumlah.r2 * 100)}%, persentase{" "}
-          {Math.round(modelPersentase.r2 * 100)}%). Hasil prediksi dapat bias karena model hanya
-          mengikuti tren data sebelumnya.
-        </p>
+        {r2 ? (
+          <p className="mt-2 text-[11px] text-slate-500">
+            Area abu-abu: prediksi {FORECAST_PERIODS} tahun ke depan dengan regresi linear
+            (R² jumlah {Math.round(r2.jumlah * 100)}%, persentase{" "}
+            {Math.round(r2.persentase * 100)}%). Hasil prediksi dapat bias karena model hanya
+            mengikuti tren data sebelumnya.
+          </p>
+        ) : (
+          <p className="mt-2 text-[11px] text-slate-500">
+            Prediksi muncul setelah tersedia data minimal {MIN_TITIK_PREDIKSI} tahun.
+          </p>
+        )}
       </div>
     </Panel>
   );

@@ -1,18 +1,12 @@
 "use server";
 
+import { and, count, eq, sql } from "drizzle-orm";
 import { refresh, revalidatePath } from "next/cache";
 import { jenisAcaraOptions, type JenisAcara } from "@/data/acara";
-import { sekolahList } from "@/data/sekolah";
-import {
-  createAcara,
-  deleteAcara,
-  findAcara,
-  totalPeserta,
-  updateAcara,
-  type AcaraInput,
-} from "@/lib/acara-store";
 import { inputWibToIso } from "@/lib/acara-format";
-import { getCurrentAccount } from "@/lib/session";
+import { akunAdmin, sesiBerakhir, tidakBerhak } from "@/lib/aksi-server";
+import { db, schema } from "@/lib/db";
+import { bolehAksesSekolah } from "@/lib/session";
 
 export type AcaraFormValues = {
   judul: string;
@@ -27,16 +21,17 @@ export type AcaraFormValues = {
 
 export type AcaraActionResult = { error?: string; success?: string };
 
-async function pastikanAdmin() {
-  const account = await getCurrentAccount();
-  return account?.role === "admin";
-}
+type AcaraInput = Omit<typeof schema.acara.$inferInsert, "id" | "terdaftar">;
 
-function validasi(values: AcaraFormValues): { error: string } | { input: AcaraInput } {
+async function validasi(values: AcaraFormValues): Promise<{ error: string } | { input: AcaraInput }> {
   const judul = values.judul.trim();
   if (judul.length < 5) return { error: "Judul acara minimal 5 karakter." };
   if (!jenisAcaraOptions.includes(values.jenis as JenisAcara)) return { error: "Pilih jenis acara." };
-  if (!sekolahList.some((s) => s.nama === values.sekolah)) return { error: "Pilih sekolah penyelenggara." };
+  const [sekolah] = await db
+    .select({ nama: schema.sekolah.nama })
+    .from(schema.sekolah)
+    .where(eq(schema.sekolah.nama, values.sekolah));
+  if (!sekolah) return { error: "Pilih sekolah penyelenggara." };
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(values.tanggal)) return { error: "Isi tanggal dan jam acara." };
   if (!values.lokasi.trim()) return { error: "Lokasi acara wajib diisi." };
   if (!values.deskripsi.trim()) return { error: "Deskripsi acara wajib diisi." };
@@ -61,30 +56,51 @@ function segarkan() {
   refresh();
 }
 
+async function jumlahPeserta(acaraId: string, terdaftar: number) {
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(schema.acaraPeserta)
+    .where(eq(schema.acaraPeserta.acaraId, acaraId));
+  return terdaftar + n;
+}
+
 export async function simpanAcara(id: string | null, values: AcaraFormValues): Promise<AcaraActionResult> {
-  if (!(await pastikanAdmin())) return { error: "Hanya admin yang dapat mengelola acara." };
-  const hasil = validasi(values);
+  const account = await akunAdmin();
+  if (!account) return sesiBerakhir;
+  const hasil = await validasi(values);
   if ("error" in hasil) return hasil;
+  if (!bolehAksesSekolah(account, hasil.input.sekolah)) return tidakBerhak;
 
   if (id) {
-    const lama = findAcara(id);
-    if (!lama) return { error: "Acara tidak ditemukan." };
-    if (hasil.input.kuota < totalPeserta(lama)) {
-      return { error: `Kuota tidak boleh kurang dari jumlah peserta saat ini (${totalPeserta(lama)}).` };
+    const [lama] = await db.select().from(schema.acara).where(eq(schema.acara.id, id));
+    if (!lama || !bolehAksesSekolah(account, lama.sekolah)) return { error: "Acara tidak ditemukan." };
+    const peserta = await jumlahPeserta(id, lama.terdaftar);
+    if (hasil.input.kuota < peserta) {
+      return { error: `Kuota tidak boleh kurang dari jumlah peserta saat ini (${peserta}).` };
     }
-    updateAcara(id, hasil.input);
+    await db.update(schema.acara).set(hasil.input).where(eq(schema.acara.id, id));
     segarkan();
     return { success: "Perubahan acara berhasil disimpan." };
   }
 
-  createAcara(hasil.input);
+  const [{ max }] = await db
+    .select({ max: sql<number>`coalesce(max(substring(${schema.acara.id} from '[0-9]+')::int), 0)` })
+    .from(schema.acara);
+  await db.insert(schema.acara).values({
+    ...hasil.input,
+    id: `ACR-${String(Number(max) + 1).padStart(3, "0")}`,
+    terdaftar: 0,
+  });
   segarkan();
   return { success: "Acara baru berhasil ditambahkan." };
 }
 
 export async function hapusAcara(id: string): Promise<AcaraActionResult> {
-  if (!(await pastikanAdmin())) return { error: "Hanya admin yang dapat mengelola acara." };
-  if (!deleteAcara(id)) return { error: "Acara tidak ditemukan." };
+  const account = await akunAdmin();
+  if (!account) return sesiBerakhir;
+  const [lama] = await db.select({ sekolah: schema.acara.sekolah }).from(schema.acara).where(eq(schema.acara.id, id));
+  if (!lama || !bolehAksesSekolah(account, lama.sekolah)) return { error: "Acara tidak ditemukan." };
+  await db.delete(schema.acara).where(and(eq(schema.acara.id, id)));
   segarkan();
   return { success: "Acara berhasil dihapus." };
 }

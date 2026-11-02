@@ -2,7 +2,9 @@
 
 import { createContext, useContext, useState } from "react";
 import type { CeritaAlumni } from "@/data/cerita";
+import type { CeritaPortal } from "@/lib/data";
 import type { SessionAccount } from "@/lib/session";
+import { toggleApresiasi as simpanApresiasi } from "@/app/alumni/actions";
 
 export type Notifikasi = {
   id: string;
@@ -14,7 +16,8 @@ export type Notifikasi = {
 };
 
 // State portal alumni yang dipakai bersama antarhalaman: akun yang login, cerita,
-// apresiasi, dan notifikasi. Masih di memori browser: hilang saat di-refresh.
+// apresiasi, dan notifikasi. Cerita dan apresiasi tersimpan di database; notifikasi masih
+// di memori browser dan hilang saat di-refresh.
 type PortalStore = {
   account: SessionAccount;
   ceritaList: CeritaAlumni[];
@@ -43,11 +46,13 @@ export function PortalProvider({
   children,
 }: {
   account: SessionAccount;
-  initialCerita: CeritaAlumni[];
+  initialCerita: CeritaPortal[];
   children: React.ReactNode;
 }) {
-  const [ceritaList, setCeritaList] = useState(initialCerita);
-  const [apresiasiSaya, setApresiasiSaya] = useState<Set<string>>(() => new Set());
+  const [ceritaList, setCeritaList] = useState<CeritaAlumni[]>(initialCerita);
+  const [apresiasiSaya, setApresiasiSaya] = useState<Set<string>>(
+    () => new Set(initialCerita.filter((c) => c.sayaApresiasi).map((c) => c.id)),
+  );
   const [notifikasi, setNotifikasi] = useState<Notifikasi[]>([]);
 
   const store: PortalStore = {
@@ -55,7 +60,16 @@ export function PortalProvider({
     ceritaList,
     setCeritaList,
     apresiasiSaya,
-    toggleApresiasi: (id) => setApresiasiSaya((prev) => toggleIn(prev, id)),
+    // Langsung berubah di layar, lalu dikembalikan bila gagal tersimpan di server.
+    toggleApresiasi: (id) => {
+      const beri = !apresiasiSaya.has(id);
+      setApresiasiSaya((prev) => toggleIn(prev, id));
+      simpanApresiasi(id, beri)
+        .then((hasil) => {
+          if (hasil.error) setApresiasiSaya((prev) => toggleIn(prev, id));
+        })
+        .catch(() => setApresiasiSaya((prev) => toggleIn(prev, id)));
+    },
     notifikasi,
     tambahNotifikasi: (judul, pesan) =>
       setNotifikasi((prev) => [

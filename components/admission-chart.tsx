@@ -1,10 +1,10 @@
 "use client";
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { admissionChannels } from "@/data/dashboard";
 import { Panel } from "@/components/panel";
+import type { ItemPersen } from "@/lib/dashboard-stats";
 
-export function AdmissionChart() {
+export function AdmissionChart({ data: admissionChannels }: { data: ItemPersen[] }) {
   const total = admissionChannels.reduce((sum, item) => sum + item.value, 0);
 
   return (

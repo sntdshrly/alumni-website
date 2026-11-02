@@ -1,8 +1,8 @@
-import { topUniversities } from "@/data/dashboard";
 import { Panel } from "@/components/panel";
+import type { ItemPersen } from "@/lib/dashboard-stats";
 
-export function UniversityChart() {
-  const max = Math.max(...topUniversities.map((u) => u.value));
+export function UniversityChart({ data: topUniversities }: { data: ItemPersen[] }) {
+  const max = Math.max(1, ...topUniversities.map((u) => u.value));
 
   return (
     <Panel title="Top 5 Perguruan Tinggi Tujuan">

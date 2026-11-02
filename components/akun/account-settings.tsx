@@ -6,6 +6,7 @@ import {
   changePassword,
   requestAccountDeletion,
   requestEmailChange,
+  updateNama,
   type AccountActionResult,
 } from "@/app/dashboard/akun/actions";
 import { Header } from "@/components/header";
@@ -130,10 +131,18 @@ export function AccountSettings({
 
   function handleSave() {
     if (!isNamaValid || !isDirty) return;
-    setSavedNama(nama.trim());
-    setNama(nama.trim());
-    setSavedAvatar(avatar);
-    setPageNotice({ success: "Perubahan profil berhasil disimpan." });
+    startTransition(async () => {
+      // Nama disimpan ke database; foto profil masih hanya tersimpan di browser.
+      const result = nama.trim() !== savedNama ? await updateNama(nama) : { success: "Perubahan profil berhasil disimpan." };
+      if (result.error) {
+        setPageNotice(result);
+        return;
+      }
+      setSavedNama(nama.trim());
+      setNama(nama.trim());
+      setSavedAvatar(avatar);
+      setPageNotice(result);
+    });
   }
 
   function openDialog(kind: Exclude<DialogKind, null>) {

@@ -51,9 +51,14 @@ import { Header } from "@/components/header";
 import { ImportDialog } from "@/components/import/import-dialog";
 import { kolomSekolah, validasiSekolah, type SekolahImpor } from "@/components/import/definisi-impor";
 import { downloadCsv, reportFilename } from "@/lib/export-csv";
+import { AksiError, useAksi } from "@/components/aksi";
+import { hapusSekolah, imporSekolah, tambahSekolah, ubahSekolah } from "@/app/dashboard/sekolah/actions";
 
 type SchoolManagerProps = {
   schools: Sekolah[];
+  // false untuk Admin Sekolah: hanya boleh mengubah profil sekolahnya sendiri.
+  bisaKelola: boolean;
+  sekolahOptions: string[];
 };
 
 type SortOption = "default" | "alumni-desc" | "alumni-asc";
@@ -189,8 +194,9 @@ function StatCard({
   );
 }
 
-export function SchoolManager({ schools: initialSchools }: SchoolManagerProps) {
+export function SchoolManager({ schools: initialSchools, bisaKelola, sekolahOptions }: SchoolManagerProps) {
   const [schools, setSchools] = useState(initialSchools);
+  const { jalankan, error: aksiError, tutupError, isPending } = useAksi();
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("default");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -242,31 +248,37 @@ export function SchoolManager({ schools: initialSchools }: SchoolManagerProps) {
 
   function saveEdit() {
     if (!selectedSchool || !draft) return;
-    setSchools((prev) =>
-      prev.map((s) =>
-        s.id === selectedSchool.id
-          ? {
-              ...s,
-              npsn: draft.npsn,
-              jenisSekolah: draft.jenisSekolah,
-              kepalaSekolah: draft.kepalaSekolah,
-              lokasi: draft.lokasi,
-              email: draft.email,
-              telepon: draft.telepon,
-              tahunBergabung: Number(draft.tahunBergabung),
-              terakhirDiperbarui: formatToday(),
-            }
-          : s,
-      ),
+    const updated: Sekolah = {
+      ...selectedSchool,
+      npsn: draft.npsn,
+      jenisSekolah: draft.jenisSekolah,
+      kepalaSekolah: draft.kepalaSekolah,
+      lokasi: draft.lokasi,
+      email: draft.email,
+      telepon: draft.telepon,
+      tahunBergabung: Number(draft.tahunBergabung),
+      terakhirDiperbarui: formatToday(),
+    };
+    jalankan(
+      () => ubahSekolah(updated),
+      () => {
+        setSchools((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+        setMode("view");
+      },
     );
-    setMode("view");
   }
 
   function confirmDelete() {
     if (!selectedSchool) return;
-    setSchools((prev) => prev.filter((s) => s.id !== selectedSchool.id));
-    setSelectedId(null);
-    setMode("view");
+    const id = selectedSchool.id;
+    jalankan(
+      () => hapusSekolah(id),
+      () => {
+        setSchools((prev) => prev.filter((s) => s.id !== id));
+        setSelectedId(null);
+        setMode("view");
+      },
+    );
   }
 
   function openAddDialog() {
@@ -279,20 +291,23 @@ export function SchoolManager({ schools: initialSchools }: SchoolManagerProps) {
     if (!open) setAddDraft(emptyAddDraft());
   }
 
-  function importSekolah(items: SekolahImpor[]) {
-    setSchools((prev) => {
-      const next = [...prev];
-      for (const item of items) {
-        next.push({
-          ...item,
-          id: generateUniqueId(item.npsn, next),
-          alumni: 0,
-          perluPembaruan: false,
-          terakhirDiperbarui: formatToday(),
-        });
-      }
-      return next;
-    });
+  async function importSekolah(items: SekolahImpor[]) {
+    const next = [...schools];
+    const baru: Sekolah[] = [];
+    for (const item of items) {
+      const sekolah: Sekolah = {
+        ...item,
+        id: generateUniqueId(item.npsn, next),
+        alumni: 0,
+        perluPembaruan: false,
+        terakhirDiperbarui: formatToday(),
+      };
+      next.push(sekolah);
+      baru.push(sekolah);
+    }
+    const hasil = await imporSekolah(baru);
+    if (!hasil.error) setSchools(next);
+    return hasil;
   }
 
   function submitAdd() {
@@ -312,9 +327,14 @@ export function SchoolManager({ schools: initialSchools }: SchoolManagerProps) {
       tahunBergabung: Number(addDraft.tahunBergabung),
       terakhirDiperbarui: formatToday(),
     };
-    setSchools((prev) => [...prev, newSchool]);
-    setIsAddOpen(false);
-    setAddDraft(emptyAddDraft());
+    jalankan(
+      () => tambahSekolah(newSchool),
+      () => {
+        setSchools((prev) => [...prev, newSchool]);
+        setIsAddOpen(false);
+        setAddDraft(emptyAddDraft());
+      },
+    );
   }
 
   const isEmailValid = !draft || emailPattern.test(draft.email);
@@ -377,7 +397,8 @@ export function SchoolManager({ schools: initialSchools }: SchoolManagerProps) {
 
   return (
     <>
-      <Header title="Sekolah" onDownload={downloadReport} />
+      <Header title="Sekolah" onDownload={downloadReport} sekolahOptions={sekolahOptions} />
+      <AksiError pesan={aksiError} onClose={tutupError} />
 
       <main className="flex-1 p-6">
         <div className="flex flex-col gap-4">
@@ -446,17 +467,21 @@ export function SchoolManager({ schools: initialSchools }: SchoolManagerProps) {
                     </DropdownMenuRadioGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button variant="outline" className="gap-1.5" onClick={() => setIsImportOpen(true)}>
-                  <FileSpreadsheet className="size-4" />
-                  Import Excel
-                </Button>
-                <Button
-                  className="gap-1.5 bg-blue-600 hover:bg-blue-700"
-                  onClick={openAddDialog}
-                >
-                  <Plus className="size-4" />
-                  Tambah Sekolah
-                </Button>
+                {bisaKelola && (
+                  <>
+                    <Button variant="outline" className="gap-1.5" onClick={() => setIsImportOpen(true)}>
+                      <FileSpreadsheet className="size-4" />
+                      Import Excel
+                    </Button>
+                    <Button
+                      className="gap-1.5 bg-blue-600 hover:bg-blue-700"
+                      onClick={openAddDialog}
+                    >
+                      <Plus className="size-4" />
+                      Tambah Sekolah
+                    </Button>
+                  </>
+                )}
                 <ImportDialog<SekolahImpor>
                   open={isImportOpen}
                   onOpenChange={setIsImportOpen}
@@ -607,14 +632,16 @@ export function SchoolManager({ schools: initialSchools }: SchoolManagerProps) {
                   </div>
 
                   <DialogFooter>
-                    <Button
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={() => setMode("delete")}
-                    >
-                      <Trash2 className="size-3.5 text-rose-600" />
-                      <span className="text-rose-600">Hapus</span>
-                    </Button>
+                    {bisaKelola && (
+                      <Button
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => setMode("delete")}
+                      >
+                        <Trash2 className="size-3.5 text-rose-600" />
+                        <span className="text-rose-600">Hapus</span>
+                      </Button>
+                    )}
                     <Button
                       className="gap-1.5 bg-blue-600 hover:bg-blue-700"
                       onClick={startEdit}
@@ -777,7 +804,7 @@ export function SchoolManager({ schools: initialSchools }: SchoolManagerProps) {
                     </Button>
                     <Button
                       className="bg-blue-600 hover:bg-blue-700"
-                      disabled={!isDraftComplete}
+                      disabled={!isDraftComplete || isPending}
                       onClick={saveEdit}
                     >
                       Simpan Perubahan
@@ -805,7 +832,7 @@ export function SchoolManager({ schools: initialSchools }: SchoolManagerProps) {
                     <Button variant="outline" onClick={() => setMode("view")}>
                       Batal
                     </Button>
-                    <Button variant="destructive" onClick={confirmDelete}>
+                    <Button variant="destructive" disabled={isPending} onClick={confirmDelete}>
                       Ya, Hapus Sekolah
                     </Button>
                   </DialogFooter>
@@ -985,7 +1012,7 @@ export function SchoolManager({ schools: initialSchools }: SchoolManagerProps) {
                 </Button>
                 <Button
                   className="bg-blue-600 hover:bg-blue-700"
-                  disabled={!isAddComplete}
+                  disabled={!isAddComplete || isPending}
                   onClick={submitAdd}
                 >
                   Simpan Sekolah

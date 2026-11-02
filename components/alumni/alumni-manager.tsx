@@ -34,6 +34,8 @@ import { useAlumniStore } from "@/components/alumni/alumni-store";
 import { ValidasiBadge, validasiDeskripsi, validasiKpi } from "@/components/validasi";
 import { DownloadReportButton } from "@/components/download-report-button";
 import { downloadCsv, reportFilename } from "@/lib/export-csv";
+import { AksiError, useAksi } from "@/components/aksi";
+import { hapusAlumni, simpanAlumni, tambahAlumni } from "@/app/dashboard/data-alumni/actions";
 import {
   normalizeSocialHandle,
   socialInputPrefix,
@@ -675,6 +677,7 @@ export function AlumniManager({
   currentAdmin,
 }: AlumniManagerProps) {
   const [alumniList, setAlumniList] = useAlumniStore();
+  const { jalankan, error: aksiError, tutupError, isPending } = useAksi();
   const angkatanOptions = useMemo(
     () =>
       Array.from(new Set(alumniList.map((a) => a.tahunLulus))).sort(
@@ -803,21 +806,30 @@ export function AlumniManager({
           catatanValidasi: "",
         }
       : {};
-    setAlumniList((prev) =>
-      prev.map((a) =>
-        a.nik === selected.nik ? { ...a, ...fields, ...pemeriksaFields } : a,
-      ),
+    const nikLama = selected.nik;
+    const updated: Alumni = { ...selected, ...fields, ...pemeriksaFields };
+    jalankan(
+      () => simpanAlumni(nikLama, updated),
+      () => {
+        setAlumniList((prev) => prev.map((a) => (a.nik === nikLama ? updated : a)));
+        // NIK adalah kunci data, jadi ikuti nilai barunya bila NIK dikoreksi.
+        setSelectedId(updated.nik);
+        setMode("view");
+      },
     );
-    // NIK adalah kunci data, jadi ikuti nilai barunya bila NIK dikoreksi.
-    setSelectedId(fields.nik);
-    setMode("view");
   }
 
   function confirmDelete() {
     if (!selected) return;
-    setAlumniList((prev) => prev.filter((a) => a.nik !== selected.nik));
-    setSelectedId(null);
-    setMode("view");
+    const nik = selected.nik;
+    jalankan(
+      () => hapusAlumni(nik),
+      () => {
+        setAlumniList((prev) => prev.filter((a) => a.nik !== nik));
+        setSelectedId(null);
+        setMode("view");
+      },
+    );
   }
 
   function freshAddDraft() {
@@ -837,18 +849,18 @@ export function AlumniManager({
   }
 
   // Alumni hasil impor masuk antrean verifikasi (Pending) dengan privasi bawaan tertutup.
-  function importAlumni(items: AlumniImpor[]) {
-    setAlumniList((prev) => [
-      ...prev,
-      ...items.map((item) => ({
-        ...item,
-        terakhirDikonfirmasi: formatToday(),
-        validasi: "Pending" as const,
-        pemeriksa: "",
-        catatanValidasi: "",
-        ...pengaturanBerbagiDefault,
-      })),
-    ]);
+  async function importAlumni(items: AlumniImpor[]) {
+    const baru: Alumni[] = items.map((item) => ({
+      ...item,
+      terakhirDikonfirmasi: formatToday(),
+      validasi: "Pending" as const,
+      pemeriksa: "",
+      catatanValidasi: "",
+      ...pengaturanBerbagiDefault,
+    }));
+    const hasil = await tambahAlumni(baru);
+    if (!hasil.error) setAlumniList((prev) => [...prev, ...baru]);
+    return hasil;
   }
 
   function submitAdd() {
@@ -860,8 +872,13 @@ export function AlumniManager({
       catatanValidasi: "",
       ...pengaturanBerbagiDefault,
     };
-    setAlumniList((prev) => [...prev, newAlumni]);
-    setIsAddOpen(false);
+    jalankan(
+      () => tambahAlumni([newAlumni]),
+      () => {
+        setAlumniList((prev) => [...prev, newAlumni]);
+        setIsAddOpen(false);
+      },
+    );
   }
 
   const isFilterActive = validasiFilter !== "semua" || statusFilter !== "semua";
@@ -921,6 +938,7 @@ export function AlumniManager({
 
   return (
     <>
+      <AksiError pesan={aksiError} onClose={tutupError} />
       <Header
         title="Data Alumni"
         actions={
@@ -1334,7 +1352,7 @@ export function AlumniManager({
                     </Button>
                     <Button
                       className="bg-blue-600 hover:bg-blue-700"
-                      disabled={!isEditComplete}
+                      disabled={!isEditComplete || isPending}
                       onClick={saveEdit}
                     >
                       Simpan Perubahan
@@ -1361,7 +1379,7 @@ export function AlumniManager({
                     <Button variant="outline" onClick={() => setMode("view")}>
                       Batal
                     </Button>
-                    <Button variant="destructive" onClick={confirmDelete}>
+                    <Button variant="destructive" disabled={isPending} onClick={confirmDelete}>
                       Ya, Hapus Alumni
                     </Button>
                   </DialogFooter>
@@ -1395,7 +1413,7 @@ export function AlumniManager({
                 </Button>
                 <Button
                   className="bg-blue-600 hover:bg-blue-700"
-                  disabled={!isAddComplete}
+                  disabled={!isAddComplete || isPending}
                   onClick={submitAdd}
                 >
                   Simpan Alumni

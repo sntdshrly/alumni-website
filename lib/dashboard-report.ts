@@ -1,14 +1,6 @@
 // Laporan Dashboard dalam satu file Excel: satu sheet untuk setiap bagian dashboard.
 
-import {
-  admissionChannels,
-  dashboardData,
-  kpiCards,
-  statusAlumni,
-  topStudyPrograms,
-  topUniversities,
-  trendAlumni,
-} from "@/data/dashboard";
+import type { DashboardView } from "@/lib/dashboard-stats";
 
 export type FilterDashboard = {
   tahunLulus: string;
@@ -19,7 +11,9 @@ export type FilterDashboard = {
 const persen = (n: number) => `${n.toFixed(2).replace(".", ",")}%`;
 
 // Membuat workbook laporan; dipisah dari unduhan agar bisa diuji.
-export async function buatLaporanDashboard(filter: FilterDashboard, sekarang = new Date()) {
+export async function buatLaporanDashboard(filter: FilterDashboard, data: DashboardView, sekarang = new Date()) {
+  const { status: statusAlumni, tren: trendAlumni, universitas: topUniversities, prodi: topStudyPrograms, jalur: admissionChannels } = data;
+  const persenLanjut = data.totalAlumni ? (data.melanjutkanPT / data.totalAlumni) * 100 : 0;
   const XLSX = await import("xlsx");
   const tanggal = new Intl.DateTimeFormat("id-ID", {
     dateStyle: "long",
@@ -46,9 +40,11 @@ export async function buatLaporanDashboard(filter: FilterDashboard, sekarang = n
         ["Periode Data", filter.periodeData],
         [],
         ["Indikator", "Nilai", "Keterangan"],
-        ...kpiCards.map((k) => [k.label, Number(k.value), k.caption]),
-        ["Alumni Terkonfirmasi", dashboardData.confirmed, ""],
-        ["Alumni Belum Terverifikasi", dashboardData.unverified, ""],
+        ["Total Alumni", data.totalAlumni, "Semua angkatan"],
+        ["Melanjutkan ke PT", data.melanjutkanPT, `${persen(persenLanjut)} dari total alumni`],
+        ["Perguruan Tinggi", data.jumlahPT, `${data.jumlahPT} tujuan berbeda`],
+        ["Alumni Terkonfirmasi", data.terkonfirmasi, ""],
+        ["Alumni Belum Terverifikasi", data.belumTerverifikasi, ""],
       ],
       [30, 32, 30],
     ),
@@ -124,8 +120,8 @@ export async function buatLaporanDashboard(filter: FilterDashboard, sekarang = n
   return { wb, namaFile: `laporan-dashboard-${stamp}.xlsx` };
 }
 
-export async function unduhLaporanDashboard(filter: FilterDashboard) {
+export async function unduhLaporanDashboard(filter: FilterDashboard, data: DashboardView) {
   const XLSX = await import("xlsx");
-  const { wb, namaFile } = await buatLaporanDashboard(filter);
+  const { wb, namaFile } = await buatLaporanDashboard(filter, data);
   XLSX.writeFile(wb, namaFile);
 }

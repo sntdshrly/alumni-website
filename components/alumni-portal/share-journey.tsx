@@ -3,10 +3,12 @@
 import { useMemo, useState } from "react";
 import { HandHeart, PenLine, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { kategoriCeritaOptions, type CeritaAlumni, type KategoriCerita } from "@/data/cerita";
+import { kategoriCeritaOptions, type KategoriCerita } from "@/data/cerita";
 import type { PerguruanTinggi } from "@/data/perguruan-tinggi";
 import { useAlumniStore } from "@/components/alumni/alumni-store";
 import { usePortal } from "@/components/alumni-portal/portal-store";
+import { AksiError, useAksi } from "@/components/aksi";
+import { hapusCerita, terbitkanCerita } from "@/app/alumni/actions";
 import { Avatar, ringkasanKegiatan } from "@/components/alumni-portal/shared";
 import { Header } from "@/components/header";
 import { NotificationBell } from "@/components/alumni-portal/notification-bell";
@@ -49,11 +51,6 @@ const tanggalFormatter = new Intl.DateTimeFormat("id-ID", {
 
 function formatTanggal(iso: string) {
   return tanggalFormatter.format(new Date(iso));
-}
-
-function nextCeritaId(list: CeritaAlumni[]) {
-  const max = list.reduce((acc, c) => Math.max(acc, Number(c.id.replace(/\D/g, "")) || 0), 0);
-  return `CRT-${String(max + 1).padStart(3, "0")}`;
 }
 
 function KategoriBadge({ kategori }: { kategori: KategoriCerita }) {
@@ -99,6 +96,7 @@ function ApresiasiButton({
 
 export function ShareJourney({ perguruanTinggi }: { perguruanTinggi: PerguruanTinggi[] }) {
   const { account, ceritaList, setCeritaList, apresiasiSaya, toggleApresiasi } = usePortal();
+  const { jalankan, error: aksiError, tutupError, isPending } = useAksi();
   const [alumniList] = useAlumniStore();
   const [tab, setTab] = useState<Tab>("semua");
   const [kategori, setKategori] = useState<"semua" | KategoriCerita>("semua");
@@ -149,29 +147,33 @@ export function ShareJourney({ perguruanTinggi }: { perguruanTinggi: PerguruanTi
 
   function terbitkan() {
     if (!isDraftValid || !account.alumniNik) return;
-    const baru: CeritaAlumni = {
-      id: nextCeritaId(ceritaList),
-      penulisNik: account.alumniNik,
-      kategori: draftKategori,
-      judul: draftJudul.trim(),
-      isi: draftIsi.trim(),
-      tanggal: new Date().toISOString(),
-      apresiasi: 0,
-    };
-    setCeritaList((prev) => [baru, ...prev]);
-    setIsTulisOpen(false);
-    setTab("saya");
+    jalankan(
+      () => terbitkanCerita({ kategori: draftKategori, judul: draftJudul, isi: draftIsi }),
+      (hasil) => {
+        const baru = hasil.cerita;
+        if (baru) setCeritaList((prev) => [baru, ...prev]);
+        setIsTulisOpen(false);
+        setTab("saya");
+      },
+    );
   }
 
-  function hapusCerita() {
+  function hapusCeritaSaya() {
     if (!dihapus) return;
-    setCeritaList((prev) => prev.filter((c) => c.id !== dihapus.id));
-    setHapusId(null);
-    setBacaId(null);
+    const id = dihapus.id;
+    jalankan(
+      () => hapusCerita(id),
+      () => {
+        setCeritaList((prev) => prev.filter((c) => c.id !== id));
+        setHapusId(null);
+        setBacaId(null);
+      },
+    );
   }
 
   return (
     <>
+      <AksiError pesan={aksiError} onClose={tutupError} />
       <Header
         title="Share Your Journey"
         actions={
@@ -341,7 +343,7 @@ export function ShareJourney({ perguruanTinggi }: { perguruanTinggi: PerguruanTi
                 <Button variant="outline" onClick={() => setHapusId(null)}>
                   Batal
                 </Button>
-                <Button variant="destructive" onClick={hapusCerita}>
+                <Button variant="destructive" disabled={isPending} onClick={hapusCeritaSaya}>
                   Ya, Hapus
                 </Button>
               </DialogFooter>
@@ -410,7 +412,7 @@ export function ShareJourney({ perguruanTinggi }: { perguruanTinggi: PerguruanTi
             <Button variant="outline" onClick={() => setIsTulisOpen(false)}>
               Batal
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700" disabled={!isDraftValid} onClick={terbitkan}>
+            <Button className="bg-blue-600 hover:bg-blue-700" disabled={!isDraftValid || isPending} onClick={terbitkan}>
               Terbitkan Cerita
             </Button>
           </DialogFooter>

@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { isStatusBekerja, labelPekerjaan, type Alumni } from "@/data/alumni";
 import type { JenisAcara } from "@/data/acara";
-import type { AcaraPortal } from "@/lib/portal-data";
+import type { AcaraPortal } from "@/lib/data";
 import { toggleIkutAcara } from "@/app/alumni/jaringan/actions";
 import { NotificationBell } from "@/components/alumni-portal/notification-bell";
 import { tanggalAcaraSingkat } from "@/lib/acara-format";

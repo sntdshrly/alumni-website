@@ -29,6 +29,14 @@ import {
 import { Header } from "@/components/header";
 import { DownloadReportButton } from "@/components/download-report-button";
 import { downloadCsv, reportFilename } from "@/lib/export-csv";
+import { AksiError, useAksi } from "@/components/aksi";
+import {
+  aturPasswordSementara,
+  hapusPengguna,
+  tambahPengguna,
+  ubahPengguna,
+  ubahStatusPengguna,
+} from "@/app/dashboard/pengguna/actions";
 import { Input } from "@/components/ui/input";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -68,6 +76,8 @@ import {
 type UserManagerProps = {
   pengguna: Pengguna[];
   sekolahOptions: string[];
+  // Role yang boleh diberikan akun yang login; Admin Sekolah tidak bisa membuat role lintas sekolah.
+  roleOptions: RolePengguna[];
   // Email akun yang sedang login; dikirim dari server agar data auth tidak masuk ke bundle klien.
   currentUserEmail: string;
 };
@@ -164,14 +174,6 @@ function fieldsFromDraft(draft: FormDraft) {
   };
 }
 
-function nextPenggunaId(existing: Pengguna[]) {
-  const max = existing.reduce(
-    (acc, p) => Math.max(acc, Number(p.id.replace(/\D/g, "")) || 0),
-    0,
-  );
-  return `USR-${String(max + 1).padStart(3, "0")}`;
-}
-
 // Mengembalikan pesan error pertama, atau string kosong jika draft valid.
 function validateDraft(draft: FormDraft, existing: Pengguna[], ignoreId?: string) {
   if (draft.nama.trim().length === 0) return "Nama wajib diisi.";
@@ -237,11 +239,13 @@ function PenggunaFormFields({
   draft,
   onChange,
   sekolahOptions,
+  roleOptions,
 }: {
   idPrefix: string;
   draft: FormDraft;
   onChange: (draft: FormDraft) => void;
   sekolahOptions: string[];
+  roleOptions: RolePengguna[];
 }) {
   const isLintasSekolah = roleLintasSekolah.includes(draft.role);
 
@@ -288,7 +292,7 @@ function PenggunaFormFields({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {rolePenggunaOptions.map((role) => (
+            {roleOptions.map((role) => (
               <SelectItem key={role} value={role}>
                 {role}
               </SelectItem>
@@ -353,9 +357,11 @@ function PenggunaFormFields({
 export function UserManager({
   pengguna: initialPengguna,
   sekolahOptions,
+  roleOptions,
   currentUserEmail,
 }: UserManagerProps) {
   const [penggunaList, setPenggunaList] = useState(initialPengguna);
+  const { jalankan, error: aksiError, tutupError, isPending } = useAksi();
   const [now] = useState(() => Date.now());
   const [sekolahFilter, setSekolahFilter] = useState("semua");
   const [roleFilter, setRoleFilter] = useState<"semua" | RolePengguna>("semua");
@@ -433,34 +439,56 @@ export function UserManager({
 
   function saveEdit() {
     if (!selected || !draft || editError) return;
+    const id = selected.id;
     const fields = fieldsFromDraft(isSelf ? { ...draft, status: "Aktif" } : draft);
-    setPenggunaList((prev) =>
-      prev.map((p) => (p.id === selected.id ? { ...p, ...fields } : p)),
+    jalankan(
+      () => ubahPengguna(id, fields),
+      (hasil) => {
+        setPenggunaList((prev) => prev.map((p) => (p.id === id ? { ...p, ...fields } : p)));
+        setNotice(hasil.success ?? "");
+        setMode("view");
+      },
     );
-    setNotice("Perubahan data pengguna berhasil disimpan.");
-    setMode("view");
   }
 
   function toggleStatus() {
     if (!selected || isSelf) return;
+    const id = selected.id;
     const status: StatusPengguna = selected.status === "Aktif" ? "Nonaktif" : "Aktif";
-    setPenggunaList((prev) =>
-      prev.map((p) => (p.id === selected.id ? { ...p, status } : p)),
+    jalankan(
+      () => ubahStatusPengguna(id, status),
+      (hasil) => {
+        setPenggunaList((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
+        setNotice(hasil.success ?? "");
+      },
     );
-    setNotice(status === "Aktif" ? "Akun berhasil diaktifkan." : "Akun berhasil dinonaktifkan.");
   }
 
   function confirmReset() {
     if (!selected) return;
-    setNotice(`Tautan atur ulang password telah dikirim ke ${selected.email}.`);
-    setMode("view");
+    const { id, nama } = selected;
+    jalankan(
+      () => aturPasswordSementara(id),
+      (hasil) => {
+        setNotice(
+          `Password sementara untuk ${nama}: ${hasil.password}. Berikan ke pengguna dan minta ia menggantinya di menu Pengaturan Akun. Password ini tidak akan ditampilkan lagi.`,
+        );
+        setMode("view");
+      },
+    );
   }
 
   function confirmDelete() {
     if (!selected || isSelf) return;
-    setPenggunaList((prev) => prev.filter((p) => p.id !== selected.id));
-    setSelectedId(null);
-    setMode("view");
+    const id = selected.id;
+    jalankan(
+      () => hapusPengguna(id),
+      () => {
+        setPenggunaList((prev) => prev.filter((p) => p.id !== id));
+        setSelectedId(null);
+        setMode("view");
+      },
+    );
   }
 
   function openAddDialog() {
@@ -479,14 +507,14 @@ export function UserManager({
       setShowAddErrors(true);
       return;
     }
-    const newPengguna: Pengguna = {
-      ...fieldsFromDraft(addDraft),
-      id: nextPenggunaId(penggunaList),
-      terakhirLogin: "",
-      dibuatPada: new Date().toISOString(),
-    };
-    setPenggunaList((prev) => [...prev, newPengguna]);
-    setIsAddOpen(false);
+    jalankan(
+      () => tambahPengguna(fieldsFromDraft(addDraft)),
+      (hasil) => {
+        const baru = hasil.pengguna;
+        if (baru) setPenggunaList((prev) => [...prev, baru]);
+        setIsAddOpen(false);
+      },
+    );
   }
 
   const isFilterActive = roleFilter !== "semua" || statusFilter !== "semua";
@@ -504,6 +532,7 @@ export function UserManager({
 
   return (
     <>
+      <AksiError pesan={aksiError} onClose={tutupError} />
       <Header
         title="Daftar Pengguna"
         actions={
@@ -807,6 +836,7 @@ export function UserManager({
                     draft={isSelf ? { ...draft, status: "Aktif" } : draft}
                     onChange={setDraft}
                     sekolahOptions={sekolahOptions}
+                    roleOptions={roleOptions}
                   />
                   {editError && <p className="text-xs text-rose-600">{editError}</p>}
 
@@ -817,7 +847,7 @@ export function UserManager({
                     </Button>
                     <Button
                       className="bg-blue-600 hover:bg-blue-700"
-                      disabled={!!editError}
+                      disabled={!!editError || isPending}
                       onClick={saveEdit}
                     >
                       Simpan Perubahan
@@ -832,16 +862,17 @@ export function UserManager({
                     <DialogTitle>Reset Password</DialogTitle>
                   </DialogHeader>
                   <p className="text-sm text-slate-600">
-                    Tautan untuk mengatur ulang password akan dikirim ke{" "}
+                    Sistem akan membuat password sementara untuk{" "}
                     <span className="font-semibold text-slate-900">{selected.email}</span>.
-                    Password lama tetap berlaku sampai pengguna membuat password baru.
+                    Password lama langsung tidak berlaku. Gunakan juga untuk memberi akses login
+                    pertama kali kepada pengguna baru.
                   </p>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setMode("view")}>
                       Batal
                     </Button>
-                    <Button className="bg-blue-600 hover:bg-blue-700" onClick={confirmReset}>
-                      Kirim Tautan Reset
+                    <Button className="bg-blue-600 hover:bg-blue-700" disabled={isPending} onClick={confirmReset}>
+                      Buat Password Sementara
                     </Button>
                   </DialogFooter>
                 </>
@@ -862,7 +893,7 @@ export function UserManager({
                     <Button variant="outline" onClick={() => setMode("view")}>
                       Batal
                     </Button>
-                    <Button variant="destructive" onClick={confirmDelete}>
+                    <Button variant="destructive" disabled={isPending} onClick={confirmDelete}>
                       Ya, Hapus Pengguna
                     </Button>
                   </DialogFooter>
@@ -885,6 +916,7 @@ export function UserManager({
                 draft={addDraft}
                 onChange={setAddDraft}
                 sekolahOptions={sekolahOptions}
+                roleOptions={roleOptions}
               />
               {showAddErrors && addError && (
                 <p className="text-xs text-rose-600">{addError}</p>
@@ -894,7 +926,7 @@ export function UserManager({
                 <Button variant="outline" onClick={() => closeAddDialog(false)}>
                   Batal
                 </Button>
-                <Button className="bg-blue-600 hover:bg-blue-700" onClick={submitAdd}>
+                <Button className="bg-blue-600 hover:bg-blue-700" disabled={isPending} onClick={submitAdd}>
                   Simpan Pengguna
                 </Button>
               </DialogFooter>

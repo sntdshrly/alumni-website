@@ -1,6 +1,6 @@
 import { Users, CheckCircle2, AlertTriangle, GraduationCap, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { kpiCards } from "@/data/dashboard";
+import { formatPersen, type DashboardView } from "@/lib/dashboard-stats";
 
 const icons = {
   users: { Icon: Users, className: "bg-blue-50 text-blue-600" },
@@ -10,7 +10,22 @@ const icons = {
   university: { Icon: Landmark, className: "bg-cyan-50 text-cyan-600" },
 } as const;
 
-export function KpiCards() {
+export function KpiCards({ data }: { data: DashboardView }) {
+  const kpiCards = [
+    { label: "Total Alumni", value: data.totalAlumni, caption: "Semua angkatan", icon: "users" as const },
+    {
+      label: "Melanjutkan ke PT",
+      value: data.melanjutkanPT,
+      caption: `${formatPersen(data.totalAlumni ? (data.melanjutkanPT / data.totalAlumni) * 100 : 0)} dari total alumni`,
+      icon: "graduation" as const,
+    },
+    {
+      label: "Perguruan Tinggi",
+      value: data.jumlahPT,
+      caption: `${data.jumlahPT} tujuan berbeda`,
+      icon: "university" as const,
+    },
+  ];
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {kpiCards.map((kpi) => {
@@ -24,7 +39,7 @@ export function KpiCards() {
               <div>
                 <p className="text-sm text-slate-500">{kpi.label}</p>
                 <p className="mt-1.5 text-2xl font-semibold text-slate-900">
-                  {kpi.value}
+                  {kpi.value.toLocaleString("id-ID")}
                 </p>
               </div>
               <div className={cn("flex size-9 items-center justify-center rounded-lg", className)}>

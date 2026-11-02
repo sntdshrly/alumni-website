@@ -1,0 +1,852 @@
+{
+  "id": "18618978-7dde-45d3-9e82-1804f231a76a",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.acara": {
+      "name": "acara",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "sekolah": {
+          "name": "sekolah",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "judul": {
+          "name": "judul",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "jenis": {
+          "name": "jenis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tanggal": {
+          "name": "tanggal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lokasi": {
+          "name": "lokasi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deskripsi": {
+          "name": "deskripsi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kuota": {
+          "name": "kuota",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "terdaftar": {
+          "name": "terdaftar",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.acara_peserta": {
+      "name": "acara_peserta",
+      "schema": "",
+      "columns": {
+        "acara_id": {
+          "name": "acara_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nik": {
+          "name": "nik",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "acara_peserta_acara_id_acara_id_fk": {
+          "name": "acara_peserta_acara_id_acara_id_fk",
+          "tableFrom": "acara_peserta",
+          "tableTo": "acara",
+          "columnsFrom": [
+            "acara_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "acara_peserta_nik_alumni_nik_fk": {
+          "name": "acara_peserta_nik_alumni_nik_fk",
+          "tableFrom": "acara_peserta",
+          "tableTo": "alumni",
+          "columnsFrom": [
+            "nik"
+          ],
+          "columnsTo": [
+            "nik"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "acara_peserta_acara_id_nik_pk": {
+          "name": "acara_peserta_acara_id_nik_pk",
+          "columns": [
+            "acara_id",
+            "nik"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.alumni": {
+      "name": "alumni",
+      "schema": "",
+      "columns": {
+        "nik": {
+          "name": "nik",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nama": {
+          "name": "nama",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nisn": {
+          "name": "nisn",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sekolah": {
+          "name": "sekolah",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kelas": {
+          "name": "kelas",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tahun_lulus": {
+          "name": "tahun_lulus",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wali_kelas": {
+          "name": "wali_kelas",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "telepon": {
+          "name": "telepon",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "linkedin": {
+          "name": "linkedin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "instagram": {
+          "name": "instagram",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "tiktok": {
+          "name": "tiktok",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "status_setelah_lulus": {
+          "name": "status_setelah_lulus",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "perguruan_tinggi_id": {
+          "name": "perguruan_tinggi_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "program_studi": {
+          "name": "program_studi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "jabatan": {
+          "name": "jabatan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "tempat_kerja": {
+          "name": "tempat_kerja",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "terakhir_dikonfirmasi": {
+          "name": "terakhir_dikonfirmasi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "validasi": {
+          "name": "validasi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pemeriksa": {
+          "name": "pemeriksa",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "catatan_validasi": {
+          "name": "catatan_validasi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "tampil_di_jaringan": {
+          "name": "tampil_di_jaringan",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "bersedia_mentor": {
+          "name": "bersedia_mentor",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "bagikan_email": {
+          "name": "bagikan_email",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "bagikan_telepon": {
+          "name": "bagikan_telepon",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "bagikan_media_sosial": {
+          "name": "bagikan_media_sosial",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cerita": {
+      "name": "cerita",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "penulis_nik": {
+          "name": "penulis_nik",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kategori": {
+          "name": "kategori",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "judul": {
+          "name": "judul",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "isi": {
+          "name": "isi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tanggal": {
+          "name": "tanggal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "apresiasi": {
+          "name": "apresiasi",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cerita_penulis_nik_alumni_nik_fk": {
+          "name": "cerita_penulis_nik_alumni_nik_fk",
+          "tableFrom": "cerita",
+          "tableTo": "alumni",
+          "columnsFrom": [
+            "penulis_nik"
+          ],
+          "columnsTo": [
+            "nik"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cerita_apresiasi": {
+      "name": "cerita_apresiasi",
+      "schema": "",
+      "columns": {
+        "cerita_id": {
+          "name": "cerita_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nik": {
+          "name": "nik",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cerita_apresiasi_cerita_id_cerita_id_fk": {
+          "name": "cerita_apresiasi_cerita_id_cerita_id_fk",
+          "tableFrom": "cerita_apresiasi",
+          "tableTo": "cerita",
+          "columnsFrom": [
+            "cerita_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cerita_apresiasi_nik_alumni_nik_fk": {
+          "name": "cerita_apresiasi_nik_alumni_nik_fk",
+          "tableFrom": "cerita_apresiasi",
+          "tableTo": "alumni",
+          "columnsFrom": [
+            "nik"
+          ],
+          "columnsTo": [
+            "nik"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {
+        "cerita_apresiasi_cerita_id_nik_pk": {
+          "name": "cerita_apresiasi_cerita_id_nik_pk",
+          "columns": [
+            "cerita_id",
+            "nik"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pendaftaran_akun": {
+      "name": "pendaftaran_akun",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nama": {
+          "name": "nama",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sekolah": {
+          "name": "sekolah",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Menunggu'"
+        },
+        "dibuat_pada": {
+          "name": "dibuat_pada",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.pengguna": {
+      "name": "pengguna",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nama": {
+          "name": "nama",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "no_hp": {
+          "name": "no_hp",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sekolah": {
+          "name": "sekolah",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "terakhir_login": {
+          "name": "terakhir_login",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "dibuat_pada": {
+          "name": "dibuat_pada",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "pengguna_email_unique": {
+          "name": "pengguna_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.perguruan_tinggi": {
+      "name": "perguruan_tinggi",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "kode": {
+          "name": "kode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nama": {
+          "name": "nama",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "singkatan": {
+          "name": "singkatan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "jenis": {
+          "name": "jenis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kota": {
+          "name": "kota",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provinsi": {
+          "name": "provinsi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "negara": {
+          "name": "negara",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "website": {
+          "name": "website",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alumni": {
+          "name": "alumni",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "prodi": {
+          "name": "prodi",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "bukti_terverifikasi": {
+          "name": "bukti_terverifikasi",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sumber_data": {
+          "name": "sumber_data",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "terakhir_diperbarui": {
+          "name": "terakhir_diperbarui",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "perguruan_tinggi_kode_unique": {
+          "name": "perguruan_tinggi_kode_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "kode"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sekolah": {
+      "name": "sekolah",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "nama": {
+          "name": "nama",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kepala_sekolah": {
+          "name": "kepala_sekolah",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lokasi": {
+          "name": "lokasi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alumni": {
+          "name": "alumni",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "perlu_pembaruan": {
+          "name": "perlu_pembaruan",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "npsn": {
+          "name": "npsn",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "jenis_sekolah": {
+          "name": "jenis_sekolah",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "telepon": {
+          "name": "telepon",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tahun_bergabung": {
+          "name": "tahun_bergabung",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "terakhir_diperbarui": {
+          "name": "terakhir_diperbarui",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "sekolah_nama_unique": {
+          "name": "sekolah_nama_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "nama"
+          ]
+        },
+        "sekolah_npsn_unique": {
+          "name": "sekolah_npsn_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "npsn"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.statistik_sekolah": {
+      "name": "statistik_sekolah",
+      "schema": "",
+      "columns": {
+        "sekolah": {
+          "name": "sekolah",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -114,7 +114,14 @@ const sidebarConfig = {
   alumni: { home: null, groups: alumniNavGroups },
 };
 
-export function Sidebar({ variant = "admin" }: { variant?: "admin" | "alumni" }) {
+// brand: nama yang tampil di atas menu; Admin Sekolah melihat nama sekolahnya sendiri.
+export function Sidebar({
+  variant = "admin",
+  brand = "BINUS UNIVERSITY",
+}: {
+  variant?: "admin" | "alumni";
+  brand?: string;
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const { home, groups } = sidebarConfig[variant];
@@ -128,12 +135,12 @@ export function Sidebar({ variant = "admin" }: { variant?: "admin" | "alumni" })
     >
       <div className="flex items-center gap-2.5 px-5 py-5">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
-          B
+          {brand.charAt(0).toUpperCase()}
         </div>
         {!collapsed && (
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">
-              BINUS UNIVERSITY
+              {brand.toUpperCase()}
             </p>
             <p className="truncate text-xs text-slate-400">
               Alumni Tracking System

@@ -19,6 +19,8 @@ type HeaderProps = {
   actions?: React.ReactNode;
   // Dipanggil tombol "Unduh Laporan" bawaan, dengan filter yang sedang dipilih.
   onDownload?: (filter: FilterDashboard) => void;
+  // Pilihan filter sekolah bawaan; diisi sesuai sekolah yang boleh dilihat akun.
+  sekolahOptions?: string[];
 };
 
 function FilterSelect({
@@ -50,10 +52,16 @@ function FilterSelect({
   );
 }
 
-function DefaultFilters({ onDownload }: { onDownload?: (filter: FilterDashboard) => void }) {
+function DefaultFilters({
+  onDownload,
+  sekolahOptions,
+}: {
+  onDownload?: (filter: FilterDashboard) => void;
+  sekolahOptions: string[];
+}) {
   const [filter, setFilter] = useState<FilterDashboard>({
     tahunLulus: filterOptions.tahunLulus[0],
-    sekolah: filterOptions.sekolah[0],
+    sekolah: sekolahOptions[0] ?? "",
     periodeData: filterOptions.periodeData[0],
   });
 
@@ -69,7 +77,7 @@ function DefaultFilters({ onDownload }: { onDownload?: (filter: FilterDashboard)
       <FilterSelect
         value={filter.sekolah}
         onChange={(sekolah) => setFilter({ ...filter, sekolah })}
-        options={filterOptions.sekolah}
+        options={sekolahOptions}
         placeholder="Sekolah"
         className="min-w-[140px]"
       />
@@ -95,7 +103,7 @@ function DefaultFilters({ onDownload }: { onDownload?: (filter: FilterDashboard)
   );
 }
 
-export function Header({ title, actions, onDownload }: HeaderProps) {
+export function Header({ title, actions, onDownload, sekolahOptions = [] }: HeaderProps) {
   return (
     <header className="flex flex-col gap-4 border-b border-black/5 bg-white px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex items-center gap-4">
@@ -111,7 +119,7 @@ export function Header({ title, actions, onDownload }: HeaderProps) {
         <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2.5">{actions ?? <DefaultFilters onDownload={onDownload} />}</div>
+      <div className="flex flex-wrap items-center gap-2.5">{actions ?? <DefaultFilters onDownload={onDownload} sekolahOptions={sekolahOptions} />}</div>
     </header>
   );
 }

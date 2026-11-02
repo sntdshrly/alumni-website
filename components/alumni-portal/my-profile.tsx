@@ -13,6 +13,8 @@ import {
 import type { PerguruanTinggi } from "@/data/perguruan-tinggi";
 import { useAlumniStore } from "@/components/alumni/alumni-store";
 import { usePortal } from "@/components/alumni-portal/portal-store";
+import { AksiError, useAksi } from "@/components/aksi";
+import { simpanProfilSaya } from "@/app/alumni/actions";
 import { Avatar, Card, Toggle, ringkasanKegiatan } from "@/components/alumni-portal/shared";
 import { Header } from "@/components/header";
 import { NotificationBell } from "@/components/alumni-portal/notification-bell";
@@ -49,20 +51,6 @@ type ProfileDraft = Pick<
   | "bagikanMediaSosial"
 >;
 
-// Field yang perubahannya perlu dicek ulang admin; pengaturan privasi tidak termasuk.
-const fieldPerluVerifikasi: (keyof ProfileDraft)[] = [
-  "statusSetelahLulus",
-  "perguruanTinggiId",
-  "programStudi",
-  "jabatan",
-  "tempatKerja",
-  "telepon",
-  "email",
-  "linkedin",
-  "instagram",
-  "tiktok",
-];
-
 const socialPlatforms: {
   platform: SocialPlatform;
   label: string;
@@ -74,13 +62,6 @@ const socialPlatforms: {
 ];
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const monthNamesId = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
-
-function formatToday() {
-  const now = new Date();
-  return `${String(now.getDate()).padStart(2, "0")} ${monthNamesId[now.getMonth()]} ${now.getFullYear()}`;
-}
 
 function draftFromAlumni(a: Alumni): ProfileDraft {
   return {
@@ -141,6 +122,7 @@ export function MyProfile({ perguruanTinggi }: { perguruanTinggi: PerguruanTingg
   const [draft, setDraft] = useState<ProfileDraft | null>(() => (me ? draftFromAlumni(me) : null));
   const [notice, setNotice] = useState("");
   const [showErrors, setShowErrors] = useState(false);
+  const { jalankan, error: aksiError, tutupError, isPending } = useAksi();
 
   const ptById = useMemo(
     () => new Map(perguruanTinggi.map((pt) => [pt.id, pt])),
@@ -188,32 +170,16 @@ export function MyProfile({ perguruanTinggi }: { perguruanTinggi: PerguruanTingg
       return;
     }
     const cleaned = cleanDraft(draft);
-    const perluVerifikasi = fieldPerluVerifikasi.some((key) => original[key] !== cleaned[key]);
-    setAlumniList((prev) =>
-      prev.map((a) =>
-        a.nik === me.nik
-          ? {
-              ...a,
-              ...cleaned,
-              // Data yang berubah masuk antrean verifikasi admin lagi.
-              ...(perluVerifikasi
-                ? {
-                    validasi: "Pending" as const,
-                    pemeriksa: "",
-                    catatanValidasi: "",
-                    terakhirDikonfirmasi: formatToday(),
-                  }
-                : {}),
-            }
-          : a,
-      ),
-    );
-    setDraft(cleaned);
-    setShowErrors(false);
-    setNotice(
-      perluVerifikasi
-        ? "Profil tersimpan. Perubahan data akan dicek admin sekolah (status: Pending)."
-        : "Pengaturan privasi tersimpan.",
+    const nik = me.nik;
+    // Server menentukan apakah perubahan perlu diverifikasi ulang admin (status kembali Pending).
+    jalankan(
+      () => simpanProfilSaya(cleaned),
+      (hasil) => {
+        setAlumniList((prev) => prev.map((a) => (a.nik === nik ? { ...a, ...hasil.perubahan } : a)));
+        setDraft(cleaned);
+        setShowErrors(false);
+        setNotice(hasil.success ?? "");
+      },
     );
   }
 
@@ -221,6 +187,7 @@ export function MyProfile({ perguruanTinggi }: { perguruanTinggi: PerguruanTingg
 
   return (
     <>
+      <AksiError pesan={aksiError} onClose={tutupError} />
       <Header
         title="Profil Saya"
         actions={<NotificationBell />}
@@ -474,7 +441,7 @@ export function MyProfile({ perguruanTinggi }: { perguruanTinggi: PerguruanTingg
             <Button
               size="lg"
               className="bg-blue-600 hover:bg-blue-700"
-              disabled={!isDirty}
+              disabled={!isDirty || isPending}
               onClick={handleSave}
             >
               Simpan Profil
