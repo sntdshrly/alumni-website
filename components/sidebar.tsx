@@ -9,6 +9,7 @@ import {
   Users,
   ShieldCheck,
   UserCog,
+  UserPlus,
   CircleUserRound,
   CalendarDays,
   IdCard,
@@ -82,6 +83,11 @@ const adminNavGroups: NavGroup[] = [
         label: "Daftar Pengguna",
         icon: UserCog,
         href: "/dashboard/pengguna",
+      },
+      {
+        label: "Permintaan Akun",
+        icon: UserPlus,
+        href: "/dashboard/permintaan-akun",
       },
       {
         label: "Pengaturan Akun",

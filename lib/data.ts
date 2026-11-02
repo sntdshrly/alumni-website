@@ -80,6 +80,33 @@ export async function listAcara(account: SessionAccount): Promise<AcaraDenganPes
   }));
 }
 
+export type PermintaanAkun = {
+  id: string;
+  nama: string;
+  email: string;
+  sekolah: string;
+  sumber: "Formulir" | "Google";
+  dibuatPada: string;
+};
+
+// Permintaan yang masih menunggu. Permintaan dari Google belum punya sekolah, jadi hanya
+// terlihat oleh Super Admin.
+export async function listPermintaanAkun(account: SessionAccount): Promise<PermintaanAkun[]> {
+  const rows = await db
+    .select({
+      id: schema.pendaftaranAkun.id,
+      nama: schema.pendaftaranAkun.nama,
+      email: schema.pendaftaranAkun.email,
+      sekolah: schema.pendaftaranAkun.sekolah,
+      sumber: schema.pendaftaranAkun.sumber,
+      dibuatPada: schema.pendaftaranAkun.dibuatPada,
+    })
+    .from(schema.pendaftaranAkun)
+    .where(eq(schema.pendaftaranAkun.status, "Menunggu"))
+    .orderBy(asc(schema.pendaftaranAkun.dibuatPada));
+  return filterSekolah(account, rows).map((r) => ({ ...r, dibuatPada: r.dibuatPada.toISOString() }));
+}
+
 export function totalPeserta(ev: AcaraDenganPeserta) {
   return ev.terdaftar + ev.pesertaNik.length;
 }
