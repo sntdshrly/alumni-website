@@ -8,10 +8,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authButtonClassName, authInputClassName } from "@/components/auth/auth-card";
 import { register, type FormState } from "@/app/login/actions";
+import { BiodataFields } from "@/components/auth/biodata-fields";
+import { GoogleButton } from "@/components/auth/google-button";
 
 const initialState: FormState = {};
 
-export function RegisterForm({ sekolahOptions }: { sekolahOptions: string[] }) {
+export function RegisterForm({
+  sekolahOptions,
+  perguruanTinggi,
+  googleAktif,
+}: {
+  sekolahOptions: string[];
+  perguruanTinggi: { id: string; nama: string }[];
+  googleAktif: boolean;
+}) {
   const [state, formAction, isPending] = useActionState(register, initialState);
 
   if (state.success) {
@@ -30,6 +40,17 @@ export function RegisterForm({ sekolahOptions }: { sekolahOptions: string[] }) {
 
   return (
     <form action={formAction} className="mt-5 flex flex-col gap-4">
+      {googleAktif && (
+        <>
+          <GoogleButton label="Sign up with Google" />
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span className="h-px flex-1 bg-slate-200" />
+            or register with email
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+        </>
+      )}
+
       <div className="flex flex-col gap-1">
         <Label htmlFor="nama" className="text-xs text-slate-500">
           Full Name
@@ -80,6 +101,8 @@ export function RegisterForm({ sekolahOptions }: { sekolahOptions: string[] }) {
           ))}
         </select>
       </div>
+
+      <BiodataFields perguruanTinggi={perguruanTinggi} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">

@@ -5,10 +5,13 @@ import { refresh } from "next/cache";
 import { db, schema } from "@/lib/db";
 import type { Alumni } from "@/data/alumni";
 import { akunAdmin, sesiBerakhir, tidakBerhak, type HasilAksi } from "@/lib/aksi-server";
+import { emailTerpakai, pesanEmailGanda } from "@/lib/data";
 import { bolehAksesSekolah } from "@/lib/session";
 
 function pesanGagal(e: unknown): HasilAksi {
-  const pesan = String((e as { message?: string })?.message ?? "");
+  const emailGanda = pesanEmailGanda(e);
+  if (emailGanda) return { error: emailGanda };
+  const pesan = String((e as { message?: string; cause?: { message?: string } })?.cause?.message ?? (e as Error)?.message ?? "");
   if (pesan.includes("duplicate") || pesan.includes("unique")) {
     return { error: "NIK sudah terdaftar pada alumni lain." };
   }
@@ -34,6 +37,9 @@ export async function simpanAlumni(nikLama: string, data: Alumni): Promise<Hasil
     return tidakBerhak;
   }
   if (!(await sekolahTerdaftar(data.sekolah))) return { error: "Sekolah tidak terdaftar." };
+  if (await emailTerpakai(data.email, { nik: nikLama })) {
+    return { error: `Email ${data.email} sudah dipakai akun lain.` };
+  }
   try {
     await db.update(schema.alumni).set(data).where(eq(schema.alumni.nik, nikLama));
   } catch (e) {
@@ -56,6 +62,13 @@ export async function tambahAlumni(data: Alumni[]): Promise<HasilAksi> {
     .from(schema.sekolah)
     .where(inArray(schema.sekolah.nama, namaSekolah));
   if (terdaftar.length !== namaSekolah.length) return { error: "Ada sekolah yang tidak terdaftar." };
+  // Email harus unik, baik di dalam data yang ditambahkan maupun terhadap akun yang sudah ada.
+  const emailBaru = data.map((a) => a.email.trim().toLowerCase());
+  const gandaDalamFile = emailBaru.find((e, i) => emailBaru.indexOf(e) !== i);
+  if (gandaDalamFile) return { error: `Email ${gandaDalamFile} muncul lebih dari sekali.` };
+  for (const email of emailBaru) {
+    if (await emailTerpakai(email)) return { error: `Email ${email} sudah dipakai akun lain.` };
+  }
   try {
     // Alumni baru belum punya akun portal, jadi passwordHash dibiarkan kosong.
     await db.insert(schema.alumni).values(data.map((a) => ({ ...a, passwordHash: null })));

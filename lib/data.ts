@@ -1,6 +1,6 @@
 import "server-only";
 
-import { asc, eq, getTableColumns, inArray, ne, sql } from "drizzle-orm";
+import { asc, eq, getTableColumns, inArray, ne, sql, type SQL } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Alumni } from "@/data/alumni";
 import type { AcaraAlumni } from "@/data/acara";
@@ -10,6 +10,7 @@ import type { PerguruanTinggi } from "@/data/perguruan-tinggi";
 import type { Sekolah } from "@/data/sekolah";
 import { gabungStatistik, type DashboardView } from "@/lib/dashboard-stats";
 import type { SessionAccount } from "@/lib/session";
+import type { BiodataPendaftaran } from "@/lib/registrasi";
 
 // Semua query di sini menerima akun yang login dan hanya mengembalikan data sekolah yang boleh
 // dilihat akun tersebut (sekolahScope null = semua sekolah). Hash password tidak pernah ikut.
@@ -86,11 +87,11 @@ export type PermintaanAkun = {
   email: string;
   sekolah: string;
   sumber: "Formulir" | "Google";
+  biodata: BiodataPendaftaran | null;
   dibuatPada: string;
 };
 
-// Permintaan yang masih menunggu. Permintaan dari Google belum punya sekolah, jadi hanya
-// terlihat oleh Super Admin.
+// Permintaan yang masih menunggu, sesuai sekolah yang dipilih pendaftar.
 export async function listPermintaanAkun(account: SessionAccount): Promise<PermintaanAkun[]> {
   const rows = await db
     .select({
@@ -99,6 +100,7 @@ export async function listPermintaanAkun(account: SessionAccount): Promise<Permi
       email: schema.pendaftaranAkun.email,
       sekolah: schema.pendaftaranAkun.sekolah,
       sumber: schema.pendaftaranAkun.sumber,
+      biodata: schema.pendaftaranAkun.biodata,
       dibuatPada: schema.pendaftaranAkun.dibuatPada,
     })
     .from(schema.pendaftaranAkun)
@@ -195,10 +197,14 @@ export async function getAcaraPortal(account: SessionAccount): Promise<AcaraPort
   }));
 }
 
-// Email dipakai akun lain (staf atau alumni), selain pemilik yang dikecualikan.
-export async function emailTerpakai(email: string, kecuali?: { nik?: string; penggunaId?: string }) {
+// Email sudah dipakai staf, alumni, atau permintaan akun yang masih menunggu, selain pemilik
+// yang dikecualikan. Satu email hanya boleh dimiliki satu akun di seluruh sistem.
+export async function emailTerpakai(
+  email: string,
+  kecuali?: { nik?: string; penggunaId?: string; permintaanId?: string },
+) {
   const e = email.trim().toLowerCase();
-  const [staf, alumni] = await Promise.all([
+  const [staf, alumni, permintaan] = await Promise.all([
     db
       .select({ id: schema.pengguna.id })
       .from(schema.pengguna)
@@ -215,6 +221,22 @@ export async function emailTerpakai(email: string, kecuali?: { nik?: string; pen
           ? sql`lower(${schema.alumni.email}) = ${e} and ${ne(schema.alumni.nik, kecuali.nik)}`
           : sql`lower(${schema.alumni.email}) = ${e}`,
       ),
+    db
+      .select({ id: schema.pendaftaranAkun.id })
+      .from(schema.pendaftaranAkun)
+      .where(
+        sql`lower(${schema.pendaftaranAkun.email}) = ${e} and ${schema.pendaftaranAkun.status} = 'Menunggu'` as SQL,
+      ),
   ]);
-  return staf.length > 0 || alumni.length > 0;
+  return (
+    staf.length > 0 ||
+    alumni.length > 0 ||
+    permintaan.some((p) => p.id !== kecuali?.permintaanId)
+  );
+}
+
+// Memetakan pelanggaran indeks unik email dari database ke pesan yang mudah dipahami.
+export function pesanEmailGanda(e: unknown) {
+  const pesan = String((e as { message?: string; cause?: { message?: string } })?.cause?.message ?? (e as Error)?.message ?? "");
+  return /email(_menunggu)?_unik/.test(pesan) ? "Email sudah dipakai akun lain." : null;
 }

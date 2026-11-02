@@ -6,7 +6,9 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import type { StatusSetelahLulus, StatusValidasi } from "@/data/alumni";
 import type { JenisAcara } from "@/data/acara";
 import type { KategoriCerita } from "@/data/cerita";
@@ -14,6 +16,7 @@ import type { RolePengguna, StatusPengguna } from "@/data/pengguna";
 import type { JenisPT, StatusPT } from "@/data/perguruan-tinggi";
 import type { SekolahStatus } from "@/data/sekolah";
 import type { StatistikSekolah } from "@/lib/dashboard-stats";
+import type { BiodataPendaftaran } from "@/lib/registrasi";
 
 // Nama kolom ditulis camelCase di sini dan disimpan snake_case di Postgres (lihat casing di lib/db).
 
@@ -78,15 +81,18 @@ export const alumni = pgTable("alumni", {
   bagikanEmail: boolean().notNull().default(false),
   bagikanTelepon: boolean().notNull().default(false),
   bagikanMediaSosial: boolean().notNull().default(false),
-  // Diisi bila alumni sudah punya akun portal; kosong berarti belum bisa login.
+  // Diisi bila alumni sudah punya akun portal lewat password; kosong bila belum atau lewat Google.
   passwordHash: text(),
-});
+}, (t) => [
+  // Email dipakai untuk login, jadi tidak boleh ganda (huruf besar/kecil dianggap sama).
+  uniqueIndex("alumni_email_unik").on(sql`lower(${t.email})`),
+]);
 
 // Akun staf (Super Admin, Admin Sekolah, dll.). Hanya yang punya passwordHash yang bisa login.
 export const pengguna = pgTable("pengguna", {
   id: text().primaryKey(),
   nama: text().notNull(),
-  email: text().notNull().unique(),
+  email: text().notNull(),
   noHp: text().notNull(),
   role: text().$type<RolePengguna>().notNull(),
   sekolah: text().notNull(),
@@ -94,7 +100,7 @@ export const pengguna = pgTable("pengguna", {
   terakhirLogin: text().notNull().default(""),
   dibuatPada: text().notNull(),
   passwordHash: text(),
-});
+}, (t) => [uniqueIndex("pengguna_email_unik").on(sql`lower(${t.email})`)]);
 
 export const acara = pgTable("acara", {
   id: text().primaryKey(),
@@ -164,5 +170,12 @@ export const pendaftaranAkun = pgTable("pendaftaran_akun", {
   passwordHash: text(),
   sumber: text().$type<"Formulir" | "Google">().notNull().default("Formulir"),
   status: text().$type<"Menunggu" | "Disetujui" | "Ditolak">().notNull().default("Menunggu"),
+  // Biodata alumni dari pendaftar; menjadi data alumni saat permintaan disetujui.
+  biodata: jsonb().$type<BiodataPendaftaran>(),
   dibuatPada: timestamp({ withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  // Satu email hanya boleh punya satu permintaan yang masih menunggu.
+  uniqueIndex("pendaftaran_email_menunggu_unik")
+    .on(sql`lower(${t.email})`)
+    .where(sql`${t.status} = 'Menunggu'`),
+]);

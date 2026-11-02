@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify, SignJWT } from "jose";
 
 // Login Google memakai OAuth 2.0 Authorization Code + PKCE. Kredensial dibuat di Google Cloud
 // Console (OAuth client "Web application") dan disimpan sebagai env GOOGLE_CLIENT_ID/SECRET.
@@ -66,6 +66,40 @@ export async function ambilProfilGoogle(origin: string, code: string, verifier: 
       email: payload.email.toLowerCase(),
       nama: typeof payload.name === "string" && payload.name ? payload.name : payload.email,
     };
+  } catch {
+    return null;
+  }
+}
+
+// ---- Pendaftaran lewat Google ----
+// Email Google yang sudah terverifikasi dibawa ke form biodata (/register/google) dalam cookie
+// bertanda tangan, sehingga pendaftar tidak bisa mengganti email saat mengisi form.
+
+export const GOOGLE_SIGNUP_COOKIE = "google_signup";
+export const SIGNUP_MAX_AGE = 30 * 60;
+
+function signupKey() {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET belum diatur.");
+  return new TextEncoder().encode(secret);
+}
+
+export async function signSignup(profil: ProfilGoogle) {
+  return new SignJWT({ nama: profil.nama, tujuan: "google-signup" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(profil.email)
+    .setIssuedAt()
+    .setExpirationTime(`${SIGNUP_MAX_AGE}s`)
+    .sign(signupKey());
+}
+
+export async function verifySignup(token: string | undefined): Promise<ProfilGoogle | null> {
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, signupKey(), { algorithms: ["HS256"] });
+    // "tujuan" mencegah token sesi login dipakai sebagai token pendaftaran, dan sebaliknya.
+    if (payload.tujuan !== "google-signup" || typeof payload.sub !== "string") return null;
+    return { email: payload.sub, nama: typeof payload.nama === "string" ? payload.nama : payload.sub };
   } catch {
     return null;
   }

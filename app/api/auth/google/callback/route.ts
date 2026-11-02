@@ -1,17 +1,22 @@
-import { randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
 import { homePathByRole } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
-import { ambilProfilGoogle, GOOGLE_STATE_COOKIE } from "@/lib/google-oauth";
+import {
+  ambilProfilGoogle,
+  GOOGLE_SIGNUP_COOKIE,
+  GOOGLE_STATE_COOKIE,
+  signSignup,
+  SIGNUP_MAX_AGE,
+} from "@/lib/google-oauth";
 import { createSession } from "@/lib/session";
 
 const DELAPAN_JAM = 60 * 60 * 8;
 
 // Langkah 2: Google mengembalikan pengguna ke sini. Email Google yang terverifikasi dicocokkan
-// dengan akun staf lalu data alumni; email yang belum dikenal dicatat sebagai permintaan pendaftaran.
+// dengan akun staf lalu data alumni; email yang belum dikenal diarahkan ke form pendaftaran.
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const cookieStore = await cookies();
@@ -57,19 +62,26 @@ export async function GET(request: NextRequest) {
     redirect(homePathByRole.alumni);
   }
 
-  const [sudahAda] = await db
+  // Sudah mengirim pendaftaran lengkap: tinggal menunggu persetujuan admin.
+  const [menunggu] = await db
     .select({ id: schema.pendaftaranAkun.id })
     .from(schema.pendaftaranAkun)
-    .where(and(eq(schema.pendaftaranAkun.email, profil.email), eq(schema.pendaftaranAkun.status, "Menunggu")));
-  if (!sudahAda) {
-    await db.insert(schema.pendaftaranAkun).values({
-      id: randomUUID(),
-      nama: profil.nama,
-      email: profil.email,
-      sekolah: "",
-      passwordHash: null,
-      sumber: "Google",
-    });
-  }
-  redirect("/login?google=menunggu");
+    .where(
+      and(
+        sql`lower(${schema.pendaftaranAkun.email}) = ${profil.email}`,
+        eq(schema.pendaftaranAkun.status, "Menunggu"),
+        isNotNull(schema.pendaftaranAkun.biodata),
+      ),
+    );
+  if (menunggu) redirect("/login?google=menunggu");
+
+  // Belum terdaftar: lanjut ke form pilih sekolah dan isi biodata.
+  cookieStore.set(GOOGLE_SIGNUP_COOKIE, await signSignup(profil), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SIGNUP_MAX_AGE,
+  });
+  redirect("/register/google");
 }

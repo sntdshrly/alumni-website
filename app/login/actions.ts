@@ -1,11 +1,12 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { homePathByRole } from "@/lib/auth";
 import { db, schema } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
+import { bacaBiodata } from "@/lib/registrasi";
+import { simpanPermintaan } from "@/lib/registrasi-server";
 import { createSession, deleteSession } from "@/lib/session";
 
 export type LoginState = {
@@ -77,7 +78,8 @@ export async function requestPasswordReset(
   };
 }
 
-// Permintaan akun disimpan di tabel pendaftaran_akun dan menunggu persetujuan admin sekolah.
+// Permintaan akun beserta biodata disimpan di tabel pendaftaran_akun dan menunggu persetujuan
+// admin; saat disetujui, biodatanya langsung menjadi data alumni.
 export async function register(
   _prevState: FormState,
   formData: FormData
@@ -88,9 +90,6 @@ export async function register(
   const password = String(formData.get("password") ?? "");
   const konfirmasi = String(formData.get("konfirmasi") ?? "");
 
-  if (!nama || !sekolah) {
-    return { error: "Full name and school are required." };
-  }
   if (!emailPattern.test(email)) {
     return { error: "Please enter a valid email address." };
   }
@@ -101,39 +100,15 @@ export async function register(
     return { error: "Passwords do not match." };
   }
 
-  const [sekolahAda] = await db
-    .select({ nama: schema.sekolah.nama })
-    .from(schema.sekolah)
-    .where(eq(schema.sekolah.nama, sekolah));
-  if (!sekolahAda) {
-    return { error: "Please select a school from the list." };
-  }
-
-  const [stafAda, alumniAda, pendaftaranAda] = await Promise.all([
-    db.select({ id: schema.pengguna.id }).from(schema.pengguna).where(sql`lower(${schema.pengguna.email}) = ${email}`),
-    db
-      .select({ nik: schema.alumni.nik })
-      .from(schema.alumni)
-      .where(and(sql`lower(${schema.alumni.email}) = ${email}`, isNotNull(schema.alumni.passwordHash))),
-    db
-      .select({ id: schema.pendaftaranAkun.id })
-      .from(schema.pendaftaranAkun)
-      .where(and(eq(schema.pendaftaranAkun.email, email), eq(schema.pendaftaranAkun.status, "Menunggu"))),
-  ]);
-  if (stafAda.length || alumniAda.length) {
-    return { error: "This email is already registered. Please sign in or use Forgot Password." };
-  }
-  if (pendaftaranAda.length) {
-    return { error: "A registration for this email is already waiting for approval." };
-  }
-
-  await db.insert(schema.pendaftaranAkun).values({
-    id: randomUUID(),
+  const hasil = await simpanPermintaan({
     nama,
     email,
     sekolah,
+    biodata: bacaBiodata(formData),
     passwordHash: await hashPassword(password),
+    sumber: "Formulir",
   });
+  if (hasil.error) return hasil;
 
   return {
     success:
